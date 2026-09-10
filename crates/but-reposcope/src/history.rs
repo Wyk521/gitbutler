@@ -476,7 +476,7 @@ fn commit_changes(
         let previous_path = match &change {
             TreeChange::Rewrite {
                 source_location, ..
-            } => scoped_git_path(source_location, scope_prefix),
+            } => scoped_git_path(source_location.as_bstr(), scope_prefix),
             _ => None,
         };
         result.push(CommitChange {
