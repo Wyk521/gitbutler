@@ -12,16 +12,14 @@
 )]
 
 use anyhow::{Context, bail};
+#[allow(unused_imports)]
 use but_api::{
-    bitbucket, branch, commit, diff, github, gitlab, land, legacy, open, platform, resolve,
-    workspace,
+    bitbucket, branch, commit, diff, github, gitlab, land, legacy, open, platform, reposcope,
+    resolve, workspace,
 };
 use but_settings::AppSettingsWithDiskSync;
-use gitbutler_tauri::{
-    WindowState, askpass, csp::csp_with_extras, env, logs, menu, projects, settings, zip,
-};
+use gitbutler_tauri::{WindowState, askpass, env, logs, menu, projects, settings, zip};
 use tauri::{Emitter, Manager, generate_context};
-use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_log::{Target, TargetKind};
 
 fn main() -> anyhow::Result<()> {
@@ -39,10 +37,10 @@ fn main() -> anyhow::Result<()> {
     let performance_logging = std::env::var_os("GITBUTLER_PERFORMANCE_LOG").is_some();
     let tauri_debug_logging = std::env::var_os("GITBUTLER_TAURI_DEBUG_LOG").is_some();
 
-    let mut tauri_context = generate_context!();
+    let tauri_context = generate_context!();
     but_secret::secret::set_application_namespace(&tauri_context.config().identifier);
 
-    // Set the macOS notification bundle ID so notifications appear as GitButler.
+    // Set the macOS notification bundle ID so notifications appear as RepoScope Desktop.
     #[cfg(target_os = "macos")]
     {
         if let Err(e) = notify_rust::set_application(&tauri_context.config().identifier) {
@@ -58,25 +56,14 @@ fn main() -> anyhow::Result<()> {
     // - Checking for updates from
     // - Performing an update
     // This way people can be informed that there is an update even if self-updating is not possible (i.e. installed via package manager).
-    let custom_settings = if cfg!(feature = "disable-auto-updates") {
-        but_settings::customization::merge_two(
-            but_settings::customization::disable_auto_update_checks(),
-            custom_settings,
-        )
-        .into()
-    } else {
-        custom_settings
-    };
+    let custom_settings = but_settings::customization::merge_two(
+        but_settings::customization::disable_auto_update_checks(),
+        custom_settings,
+    )
+    .into();
     let mut app_settings =
         AppSettingsWithDiskSync::new_with_customization(config_dir.clone(), custom_settings)
             .expect("failed to create app settings");
-
-    if let Ok(updated_csp) = csp_with_extras(
-        tauri_context.config().app.security.csp.as_ref().cloned(),
-        &app_settings,
-    ) {
-        tauri_context.config_mut().app.security.csp = updated_csp;
-    };
 
     if let Some(project_to_open) =
         std::env::var_os("GITBUTLER_PROJECT_DIR").map(std::path::PathBuf::from)
@@ -121,15 +108,28 @@ fn main() -> anyhow::Result<()> {
 
                 // TODO(mtsgrd): Is there a better way to disable devtools in E2E tests?
                 #[cfg(debug_assertions)]
-                if tauri_app.config().product_name.as_deref() != Some("GitButler Test") {
+                if tauri_app.config().product_name.as_deref() != Some("RepoScope Desktop Test") {
                     window.open_devtools();
                 }
 
                 let app_handle = tauri_app.handle();
 
+                // RepoScope analysis runs off the UI thread.  Forward its
+                // process-local progress sink through Tauri so the frontend
+                // can react to phase changes without polling.
+                let reposcope_event_handle = app_handle.clone();
+                but_api::reposcope::subscribe_reposcope_events(
+                    move |project_id, status| {
+                        let event_name = format!("project://{project_id}/reposcope-analysis");
+                        if let Err(error) = reposcope_event_handle.emit(&event_name, &status) {
+                            tracing::debug!(%error, %event_name, "failed to emit RepoScope analysis event");
+                        }
+                    },
+                );
+
                 logs::init(app_handle, &app_log_dir, performance_logging, tokio_debug);
 
-                but_action::cli::auto_fix_broken_but_cli_symlink();
+                #[cfg(not(feature = "offline"))]
                 inherit_interactive_login_shell_environment_if_not_launched_from_terminal();
                 migrate_projects().ok();
 
@@ -142,16 +142,6 @@ fn main() -> anyhow::Result<()> {
                 } else {
                     tracing::info!("SHELL env: {var:?}", var = std::env::var_os("SHELL"));
                 }
-
-                but_askpass::init({
-                    let handle = app_handle.clone();
-                    move |event| {
-                        handle
-                            .emit("git_prompt", event)
-                            .expect("tauri event emission doesn't fail in practice")
-                    }
-                });
-
 
                 tracing::info!(version = %app_handle.package_info().version,
                                    name = %app_handle.package_info().name, "starting app");
@@ -189,54 +179,90 @@ fn main() -> anyhow::Result<()> {
                     }
                 });
 
-                let app_handle_for_deep_link = app_handle.clone();
-                app_handle.deep_link().on_open_url(move |_| {
-                    // Get main window
-                    if let Some(window) = app_handle_for_deep_link.get_window("main") {
-                        let _ = window.unminimize();
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-                });
                 Ok(())
             })
             .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
-            .plugin(tauri_plugin_shell::init())
             .plugin(tauri_plugin_os::init())
             .plugin(tauri_plugin_process::init())
-            .plugin(tauri_plugin_deep_link::init())
-            .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_dialog::init())
             .plugin(tauri_plugin_fs::init())
             .plugin(tauri_plugin_clipboard_manager::init())
             .plugin(tauri_plugin_store::Builder::default().build())
             .plugin(log.build())
             .invoke_handler(tauri::generate_handler![
+                #[cfg(not(feature = "offline"))]
                 github::tauri_init_github_device_oauth::init_github_device_oauth,
+                #[cfg(not(feature = "offline"))]
                 github::tauri_check_github_auth_status::check_github_auth_status,
+                #[cfg(not(feature = "offline"))]
                 github::tauri_store_github_pat::store_github_pat,
+                #[cfg(not(feature = "offline"))]
                 github::tauri_store_github_enterprise_pat::store_github_enterprise_pat,
+                #[cfg(not(feature = "offline"))]
                 github::tauri_get_gh_user::get_gh_user,
+                #[cfg(not(feature = "offline"))]
                 github::tauri_forget_github_account::forget_github_account,
+                #[cfg(not(feature = "offline"))]
                 github::tauri_list_known_github_accounts::list_known_github_accounts,
+                #[cfg(not(feature = "offline"))]
                 github::tauri_clear_all_github_tokens::clear_all_github_tokens,
+                #[cfg(not(feature = "offline"))]
                 gitlab::tauri_store_gitlab_pat::store_gitlab_pat,
+                #[cfg(not(feature = "offline"))]
                 gitlab::tauri_store_gitlab_selfhosted_pat::store_gitlab_selfhosted_pat,
+                #[cfg(not(feature = "offline"))]
                 gitlab::tauri_get_gl_user::get_gl_user,
+                #[cfg(not(feature = "offline"))]
                 gitlab::tauri_forget_gitlab_account::forget_gitlab_account,
+                #[cfg(not(feature = "offline"))]
                 gitlab::tauri_list_known_gitlab_accounts::list_known_gitlab_accounts,
+                #[cfg(not(feature = "offline"))]
                 gitlab::tauri_clear_all_gitlab_tokens::clear_all_gitlab_tokens,
+                #[cfg(not(feature = "offline"))]
                 bitbucket::tauri_store_bitbucket_api_token::store_bitbucket_api_token,
+                #[cfg(not(feature = "offline"))]
                 bitbucket::tauri_get_bb_user::get_bb_user,
+                #[cfg(not(feature = "offline"))]
                 bitbucket::tauri_forget_bitbucket_account::forget_bitbucket_account,
+                #[cfg(not(feature = "offline"))]
                 bitbucket::tauri_list_known_bitbucket_accounts::list_known_bitbucket_accounts,
+                #[cfg(not(feature = "offline"))]
                 bitbucket::tauri_clear_all_bitbucket_tokens::clear_all_bitbucket_tokens,
+                #[cfg(not(feature = "offline"))]
                 bitbucket::tauri_check_bitbucket_credentials::check_bitbucket_credentials,
                 diff::tauri_commit_details::commit_details,
                 diff::tauri_commit_details_with_line_stats::commit_details_with_line_stats,
                 workspace::tauri_get_workspace::get_workspace,
                 workspace::tauri_set_target_ref_and_init_project::set_target_ref_and_init_project,
                 workspace::tauri_resolve_worktree_conflicts::resolve_worktree_conflicts,
+                reposcope::tauri_reposcope_analysis_start::reposcope_analysis_start,
+                reposcope::tauri_reposcope_analysis_cancel::reposcope_analysis_cancel,
+                reposcope::tauri_reposcope_analysis_status::reposcope_analysis_status,
+                reposcope::tauri_reposcope_analysis_config::reposcope_analysis_config,
+                reposcope::tauri_reposcope_analysis_config_set::reposcope_analysis_config_set,
+                reposcope::tauri_reposcope_overview::reposcope_overview,
+                reposcope::tauri_reposcope_activity::reposcope_activity,
+                reposcope::tauri_reposcope_commits::reposcope_commits,
+                reposcope::tauri_reposcope_authors::reposcope_authors,
+                reposcope::tauri_reposcope_files::reposcope_files,
+                reposcope::tauri_reposcope_languages::reposcope_languages,
+                reposcope::tauri_reposcope_commit_detail::reposcope_commit_detail,
+                reposcope::tauri_reposcope_file_detail::reposcope_file_detail,
+                reposcope::tauri_reposcope_file_content::reposcope_file_content,
+                reposcope::tauri_reposcope_hotspots::reposcope_hotspots,
+                reposcope::tauri_reposcope_coupling::reposcope_coupling,
+                reposcope::tauri_reposcope_ownership::reposcope_ownership,
+                reposcope::tauri_reposcope_ownership_coverage::reposcope_ownership_coverage,
+                reposcope::tauri_reposcope_directory_ownership::reposcope_directory_ownership,
+                reposcope::tauri_reposcope_code_age::reposcope_code_age,
+                reposcope::tauri_reposcope_file_age_stats::reposcope_file_age_stats,
+                reposcope::tauri_reposcope_bus_factor::reposcope_bus_factor,
+                reposcope::tauri_reposcope_delivery::reposcope_delivery,
+                reposcope::tauri_reposcope_footprints::reposcope_footprints,
+                reposcope::tauri_reposcope_regions::reposcope_regions,
+                reposcope::tauri_reposcope_dependencies::reposcope_dependencies,
+                reposcope::tauri_reposcope_repository_diagnostics::reposcope_repository_diagnostics,
+                reposcope::tauri_reposcope_refs::reposcope_refs,
                 but_api::branch::tauri_branch_diff::branch_diff,
                 but_api::branch::tauri_move_branch::move_branch,
                 but_api::branch::tauri_tear_off_branch::tear_off_branch,
@@ -250,15 +276,23 @@ fn main() -> anyhow::Result<()> {
                 legacy::git::tauri_git_set_global_config::git_set_global_config,
                 legacy::git::tauri_git_remove_global_config::git_remove_global_config,
                 legacy::git::tauri_git_get_global_config::git_get_global_config,
+                #[cfg(not(feature = "offline"))]
                 legacy::git::tauri_git_test_push::git_test_push,
+                #[cfg(not(feature = "offline"))]
                 legacy::git::tauri_git_test_fetch::git_test_fetch,
                 legacy::git::tauri_git_index_size::git_index_size,
+                #[cfg(not(feature = "offline"))]
                 legacy::users::tauri_set_user::set_user,
+                #[cfg(not(feature = "offline"))]
                 legacy::users::tauri_delete_user::delete_user,
                 legacy::users::tauri_get_user::get_user,
+                #[cfg(not(feature = "offline"))]
                 legacy::users::tauri_get_login_token::get_login_token,
+                #[cfg(not(feature = "offline"))]
                 legacy::users::tauri_login_with_token::login_with_token,
+                #[cfg(not(feature = "offline"))]
                 legacy::users::tauri_get_user_profile::get_user_profile,
+                #[cfg(not(feature = "offline"))]
                 legacy::users::tauri_update_user_profile::update_user_profile,
                 legacy::projects::tauri_add_project::add_project,
                 legacy::projects::tauri_add_project_best_effort::add_project_best_effort,
@@ -267,6 +301,7 @@ fn main() -> anyhow::Result<()> {
                 legacy::projects::tauri_delete_project::delete_project,
                 legacy::projects::tauri_is_gerrit::is_gerrit,
                 legacy::repo::tauri_check_signing_settings::check_signing_settings,
+                #[cfg(not(feature = "offline"))]
                 legacy::repo::tauri_git_clone_repository::git_clone_repository,
                 legacy::repo::tauri_get_commit_file::get_commit_file,
                 legacy::repo::tauri_get_workspace_file::get_workspace_file,
@@ -284,6 +319,7 @@ fn main() -> anyhow::Result<()> {
                 legacy::virtual_branches::tauri_unapply_stack::unapply_stack,
                 legacy::virtual_branches::tauri_list_branches::list_branches,
                 legacy::virtual_branches::tauri_get_branch_listing_details::get_branch_listing_details,
+                #[cfg(not(feature = "offline"))]
                 legacy::virtual_branches::tauri_fetch_from_remotes::fetch_from_remotes,
                 legacy::virtual_branches::tauri_normalize_branch_name::normalize_branch_name,
                 branch::tauri_apply::apply,
@@ -303,6 +339,7 @@ fn main() -> anyhow::Result<()> {
                 legacy::config::tauri_store_author_globally_if_unset::store_author_globally_if_unset,
                 legacy::config::tauri_get_author_info::get_author_info,
                 legacy::remotes::tauri_list_remotes::list_remotes,
+                #[cfg(not(feature = "offline"))]
                 legacy::remotes::tauri_add_remote::add_remote,
                 legacy::modes::tauri_operating_mode::operating_mode,
                 legacy::modes::tauri_head_sha::head_sha,
@@ -311,35 +348,56 @@ fn main() -> anyhow::Result<()> {
                 legacy::modes::tauri_abort_edit_and_return_to_workspace::abort_edit_and_return_to_workspace,
                 legacy::modes::tauri_edit_initial_index_state::edit_initial_index_state,
                 legacy::modes::tauri_edit_changes_from_initial::edit_changes_from_initial,
-                open::tauri_open_url::open_url,
+                open::tauri_open_local_target::open_local_target,
                 open::tauri_open_in_terminal::open_in_terminal,
                 open::tauri_show_in_finder::show_in_finder,
                 open::terminal::tauri_get_terminal_options_for_platform::get_terminal_options_for_platform,
                 open::terminal::tauri_get_recommended_terminal_for_platform::get_recommended_terminal_for_platform,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_pr_templates::pr_templates,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_pr_template::pr_template,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_forge_provider::forge_provider,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_forge_info::forge_info,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_forge_compare_branch_url::forge_compare_branch_url,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_list_reviews::list_reviews,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_review_apply::review_apply,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_get_review::get_review,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_get_review_merge_status::get_review_merge_status,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_get_review_base_repo_url::get_review_base_repo_url,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_get_repo_info::get_repo_info,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_update_review::update_review,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_list_ci_checks::list_ci_checks,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_publish_review::publish_review,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_merge_review::merge_review,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_set_review_auto_merge::set_review_auto_merge,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_set_review_draftiness::set_review_draftiness,
+                #[cfg(not(feature = "offline"))]
                 legacy::forge::tauri_update_review_footers::update_review_footers,
+                #[cfg(not(feature = "offline"))]
                 legacy::cli::tauri_install_cli::install_cli,
+                #[cfg(not(feature = "offline"))]
                 legacy::cli::tauri_cli_path::cli_path,
                 legacy::workspace::tauri_head_info::head_info,
                 legacy::workspace::tauri_branch_details::branch_details,
                 legacy::workspace::tauri_discard_worktree_changes::discard_worktree_changes,
                 legacy::workspace::tauri_stash_into_branch::stash_into_branch,
+                #[cfg(not(feature = "offline"))]
                 legacy::workspace::tauri_workspace_branch_and_ancestors_push::workspace_branch_and_ancestors_push,
                 legacy::absorb::tauri_absorb::absorb,
                 legacy::absorb::tauri_absorption_plan::absorption_plan,
@@ -355,13 +413,18 @@ fn main() -> anyhow::Result<()> {
                 projects::open_project_in_window,
                 zip::get_logs_archive_path,
                 zip::get_project_archive_path,
+                #[cfg(not(feature = "offline"))]
                 zip::get_anonymous_graph_path,
                 settings::get_app_settings,
                 settings::update_onboarding_complete,
+                #[cfg(not(feature = "offline"))]
                 settings::update_telemetry,
                 settings::update_feature_flags,
+                #[cfg(not(feature = "offline"))]
                 settings::update_telemetry_distinct_id,
+                #[cfg(not(feature = "offline"))]
                 settings::update_fetch,
+                #[cfg(not(feature = "offline"))]
                 settings::update_reviews,
                 settings::update_ui,
                 // Debug-only - not for production!
@@ -378,11 +441,16 @@ fn main() -> anyhow::Result<()> {
                 commit::uncommit::tauri_commit_uncommit_changes::commit_uncommit_changes,
                 commit::uncommit::tauri_commit_uncommit_changes_from_commits::commit_uncommit_changes_from_commits,
                 commit::uncommit::tauri_commit_uncommit::commit_uncommit,
+                #[cfg(not(feature = "offline"))]
                 workspace::tauri_workspace_integrate_upstream::workspace_integrate_upstream,
+                #[cfg(not(feature = "offline"))]
                 workspace::tauri_workspace_fetch_from_remotes::workspace_fetch_from_remotes,
+                #[cfg(not(feature = "offline"))]
                 workspace::tauri_workspace_fetch_status::workspace_fetch_status,
-                land::tauri_branch_land::branch_land,
+                #[cfg(not(feature = "offline"))]
                 resolve::tauri_resolve_commit_conflicts_ai::resolve_commit_conflicts_ai,
+                #[cfg(not(feature = "offline"))]
+                land::tauri_branch_land::branch_land,
                 resolve::tauri_commit_conflicts::commit_conflicts,
                 resolve::tauri_resolve_commit_conflict_hunks::resolve_commit_conflict_hunks,
                 platform::tauri_build_type::build_type,
@@ -447,6 +515,7 @@ fn migrate_projects() -> anyhow::Result<()> {
 ///
 /// That way, each process launched by the backend will act similar to what users would get in their terminal,
 /// something vital to act more similar to Git, which is also launched from an interactive shell most of the time.
+#[cfg(not(feature = "offline"))]
 fn inherit_interactive_login_shell_environment_if_not_launched_from_terminal() {
     if std::env::var_os("TERM").is_some() {
         tracing::info!(

@@ -8,17 +8,17 @@ import {
 	writeText as tauriWriteText,
 	readText as tauriReadText,
 } from "@tauri-apps/plugin-clipboard-manager";
-import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { open as filePickerTauri, type OpenDialogOptions } from "@tauri-apps/plugin-dialog";
 import { readFile as tauriReadFile } from "@tauri-apps/plugin-fs";
 import { error as logErrorToFile } from "@tauri-apps/plugin-log";
 import { platform } from "@tauri-apps/plugin-os";
 import { relaunch as relaunchTauri } from "@tauri-apps/plugin-process";
 import { Store } from "@tauri-apps/plugin-store";
-import { check as tauriCheck } from "@tauri-apps/plugin-updater";
 import { readable } from "svelte/store";
-import type { AppInfo, DeepLinkHandlers, DiskStore, IBackend } from "$lib/backend/backend";
+import type { AppInfo, DiskStore, IBackend, UnlistenFn } from "$lib/backend/backend";
 import type { EventCallback, EventName } from "@tauri-apps/api/event";
+import { isOfflineCommand } from "$lib/backend/offline";
+import { redactSensitiveText } from "$lib/error/redact";
 
 export default class Tauri implements IBackend {
 	platformName = platform();
@@ -38,23 +38,17 @@ export default class Tauri implements IBackend {
 	});
 
 	async getColdStartDeepLinkUrls(): Promise<string[]> {
-		return (await getCurrent()) ?? [];
+		return [];
 	}
 
-	async initDeepLinking(handlers: DeepLinkHandlers, coldStartUrls: string[]) {
-		// Process cold-start URLs that were resolved before rendering began.
-		if (coldStartUrls.length > 0) {
-			handleDeepLinkUrls(coldStartUrls, handlers);
-		}
-
-		// Listen for new deep links while app is running
-		return await onOpenUrl((urls) => {
-			handleDeepLinkUrls(urls, handlers);
-		});
+	async initDeepLinking(_handlers: unknown, _coldStartUrls: string[]): Promise<UnlistenFn> {
+		// Deep-link login/open flows are intentionally absent from the offline
+		// product. Keep the interface for shared bootstrap code.
+		return () => undefined;
 	}
 	invoke = tauriInvoke;
 	listen = tauriListen;
-	checkUpdate = tauriCheck;
+	checkUpdate = async () => null;
 	currentVersion = tauriGetVersion;
 	readFile = tauriReadFile;
 	openExternalUrl = tauriOpenExternalUrl;
@@ -95,57 +89,10 @@ export default class Tauri implements IBackend {
 	}
 }
 
-function handleDeepLinkUrls(urls: string[], handlers: DeepLinkHandlers) {
-	// We don't care about the previous URLs, only the last one.
-	const url = urls[urls.length - 1];
-	if (!url) return;
-	const result = parseDeepLinkUrl(url);
-	if (!result) {
-		console.warn("Received invalid deep link URL:", url);
-		return;
-	}
-
-	const [topLevel, params] = result;
-	handleTopLevel(topLevel, params, handlers);
-}
-
-const LOGIN_LINK_EXPIRATION_MS = 30 * 1000; // 30 seconds
-
-function handleTopLevel(
-	path: DeepLinkTopLevelPath,
-	params: URLSearchParams,
-	handlers: DeepLinkHandlers,
-): true {
-	switch (path) {
-		case "open": {
-			const filePath = params.get("path");
-			if (filePath) {
-				handlers.open(filePath, params.get("new_window") === "1");
-			}
-			return true;
-		}
-		case "login": {
-			const accessToken = params.get("access_token");
-			const timestampStr = params.get("t");
-			if (!timestampStr) {
-				return true;
-			}
-			const timestamp = Number(timestampStr);
-			const now = Date.now();
-			if (isNaN(timestamp) || now - timestamp > LOGIN_LINK_EXPIRATION_MS) {
-				console.warn("Ignoring expired login deep link");
-				return true;
-			}
-			if (accessToken) {
-				handlers.login(accessToken);
-			}
-			return true;
-		}
-	}
-}
-
+// Kept as pure parsing helpers for the existing unit fixtures.  RepoScope
+// Desktop does not register a deep-link plugin or dispatch these URLs at
+// runtime, so this compatibility code cannot authenticate or open a path.
 const DEEP_LINK_SCHEMES = ["but", "but-dev", "but-nightly"] as const;
-
 const DEEP_LINK_TOP_LEVEL_PATHS = ["open", "login"] as const;
 type DeepLinkTopLevelPath = (typeof DEEP_LINK_TOP_LEVEL_PATHS)[number];
 
@@ -173,6 +120,7 @@ export function parseDeepLinkUrl(url: string): [DeepLinkTopLevelPath, URLSearchP
 
 	return [parsedUrl.hostname, parsedUrl.searchParams];
 }
+
 class TauriDiskStore implements DiskStore {
 	constructor(private store: Store) {}
 
@@ -223,10 +171,16 @@ async function tauriInvoke<T>(command: string, params: Record<string, unknown> =
 	// });
 
 	try {
+		if (isOfflineCommand(command)) {
+			throw new Error(`RepoScope Desktop 离线模式已禁用命令：${command}`);
+		}
 		return await invokeTauri<T>(command, params);
 	} catch (error: unknown) {
 		if (isNormalizedError(error)) {
-			console.error(`ipc->${command}: ${JSON.stringify(params)}`, error);
+			console.error(
+				`ipc->${command}: ${redactSensitiveText(JSON.stringify(params))}`,
+				redactSensitiveText(error.message),
+			);
 			// Re-throw as a proper Error subclass so the stack points at the
 			// caller and Sentry can fingerprint by name + message instead of
 			// bucketing every raw `{name, message, code}` rejection together.
@@ -243,5 +197,54 @@ function tauriListen<T>(event: EventName, handle: EventCallback<T>) {
 }
 
 async function tauriOpenExternalUrl(href: string): Promise<void> {
-	return await invokeTauri<void>("open_url", { url: href });
+	let parsed: URL;
+	try {
+		parsed = new URL(href);
+	} catch {
+		throw new Error("RepoScope Desktop 只允许打开本机文件或编辑器 URI");
+	}
+	const localEditorSchemes = new Set([
+		"file:",
+		"vscode:",
+		"vscode-insiders:",
+		"vscodium:",
+		"zed:",
+		"windsurf:",
+		"cursor:",
+		"trae:",
+		"antigravity-ide:",
+	]);
+	const hostAllowed =
+		parsed.hostname === "" ||
+		parsed.hostname.toLowerCase() === "file" ||
+		parsed.hostname.toLowerCase() === "localhost";
+	const sensitiveQuery = [...parsed.searchParams.keys()].some((key) =>
+		[
+			"token",
+			"secret",
+			"password",
+			"passwd",
+			"pwd",
+			"credential",
+			"authorization",
+			"api_key",
+			"apikey",
+			"access_key",
+			"access_token",
+			"private_key",
+			"username",
+			"user",
+		].some((needle) => key.toLowerCase() === needle || key.toLowerCase().includes(needle)),
+	);
+	if (
+		!localEditorSchemes.has(parsed.protocol) ||
+		!hostAllowed ||
+		parsed.username ||
+		parsed.password ||
+		parsed.hash ||
+		sensitiveQuery
+	) {
+		throw new Error("RepoScope Desktop 离线模式不打开外部网址");
+	}
+	await invokeTauri("open_local_target", { url: href });
 }

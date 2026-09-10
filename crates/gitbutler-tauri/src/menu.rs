@@ -10,7 +10,7 @@ use tauri::{
 static SHORTCUT_EVENT: &str = "menu://shortcut";
 
 pub fn build<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R>> {
-    #[cfg(not(feature = "disable-auto-updates"))]
+    #[cfg(not(any(feature = "disable-auto-updates", feature = "offline")))]
     let check_for_updates =
         MenuItemBuilder::with_id("global/update", "Check for updates…").build(handle)?;
 
@@ -22,7 +22,7 @@ pub fn build<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .context("App name not defined.")?;
 
     #[cfg(target_os = "macos")]
-    let settings_menu = MenuItemBuilder::with_id("global/settings", "Settings")
+    let settings_menu = MenuItemBuilder::with_id("global/settings", "设置")
         .accelerator("CmdOrCtrl+,")
         .build(handle)?;
 
@@ -34,7 +34,7 @@ pub fn build<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             .separator()
             .item(&settings_menu);
 
-        #[cfg(not(feature = "disable-auto-updates"))]
+        #[cfg(not(any(feature = "disable-auto-updates", feature = "offline")))]
         {
             menu = menu.item(&check_for_updates);
         }
@@ -49,19 +49,20 @@ pub fn build<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             .build()?
     };
 
-    let file_menu = &SubmenuBuilder::new(handle, "File")
+    let file_menu = &SubmenuBuilder::new(handle, "文件")
         .items(&[
-            &MenuItemBuilder::with_id("file/add-local-repo", "Add Local Repository…")
+            &MenuItemBuilder::with_id("file/add-local-repo", "添加本地仓库…")
                 .accelerator("CmdOrCtrl+O")
                 .build(handle)?,
-            &MenuItemBuilder::with_id("file/clone-repo", "Clone Repository…")
+            #[cfg(not(feature = "offline"))]
+            &MenuItemBuilder::with_id("file/clone-repo", "克隆仓库…")
                 .accelerator("CmdOrCtrl+Shift+O")
                 .build(handle)?,
             &PredefinedMenuItem::separator(handle)?,
-            &MenuItemBuilder::with_id("file/create-branch", "Create Branch…")
+            &MenuItemBuilder::with_id("file/create-branch", "创建分支…")
                 .accelerator("CmdOrCtrl+B")
                 .build(handle)?,
-            &MenuItemBuilder::with_id("file/create-dependent-branch", "Create Dependent Branch…")
+            &MenuItemBuilder::with_id("file/create-dependent-branch", "创建依赖分支…")
                 .accelerator("CmdOrCtrl+Shift+B")
                 .build(handle)?,
             &PredefinedMenuItem::separator(handle)?,
@@ -73,12 +74,12 @@ pub fn build<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 
     if cfg!(not(target_os = "macos")) {
         file_menu.append_items(&[&PredefinedMenuItem::quit(handle, None)?])?;
-        #[cfg(not(feature = "disable-auto-updates"))]
+        #[cfg(not(any(feature = "disable-auto-updates", feature = "offline")))]
         file_menu.append_items(&[&check_for_updates])?;
     }
 
     #[cfg(not(target_os = "linux"))]
-    let edit_menu = &Submenu::new(handle, "Edit", true)?;
+    let edit_menu = &Submenu::new(handle, "编辑", true)?;
 
     #[cfg(not(target_os = "linux"))]
     {
@@ -89,25 +90,25 @@ pub fn build<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         ])?;
     }
 
-    let view_menu = &Submenu::new(handle, "View", true)?;
+    let view_menu = &Submenu::new(handle, "视图", true)?;
 
     #[cfg(target_os = "macos")]
     view_menu.append(&PredefinedMenuItem::fullscreen(handle, None)?)?;
     view_menu.append_items(&[
-        &MenuItemBuilder::with_id("view/switch-theme", "Switch Theme")
+        &MenuItemBuilder::with_id("view/switch-theme", "切换主题")
             .accelerator("CmdOrCtrl+T")
             .build(handle)?,
-        &MenuItemBuilder::with_id("view/toggle-sidebar", "Toggle Unassigned")
+        &MenuItemBuilder::with_id("view/toggle-sidebar", "显示/隐藏侧栏")
             .accelerator("CmdOrCtrl+\\")
             .build(handle)?,
         &PredefinedMenuItem::separator(handle)?,
-        &MenuItemBuilder::with_id("view/zoom-in", "Zoom In")
+        &MenuItemBuilder::with_id("view/zoom-in", "放大")
             .accelerator("CmdOrCtrl+=")
             .build(handle)?,
-        &MenuItemBuilder::with_id("view/zoom-out", "Zoom Out")
+        &MenuItemBuilder::with_id("view/zoom-out", "缩小")
             .accelerator("CmdOrCtrl+-")
             .build(handle)?,
-        &MenuItemBuilder::with_id("view/zoom-reset", "Reset Zoom")
+        &MenuItemBuilder::with_id("view/zoom-reset", "重置缩放")
             .accelerator("CmdOrCtrl+0")
             .build(handle)?,
         &PredefinedMenuItem::separator(handle)?,
@@ -115,49 +116,48 @@ pub fn build<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 
     #[cfg(any(debug_assertions, feature = "devtools"))]
     view_menu.append_items(&[
-        &MenuItemBuilder::with_id("view/devtools", "Developer Tools")
+        &MenuItemBuilder::with_id("view/devtools", "开发者工具")
             .accelerator("CmdOrCtrl+Shift+C")
             .build(handle)?,
-        &MenuItemBuilder::with_id("view/reload", "Reload View")
+        &MenuItemBuilder::with_id("view/reload", "重新加载界面")
             .accelerator("CmdOrCtrl+R")
             .build(handle)?,
     ])?;
 
-    let mut project_menu_builder = SubmenuBuilder::new(handle, "Project")
+    let mut project_menu_builder = SubmenuBuilder::new(handle, "项目")
         .item(
-            &MenuItemBuilder::with_id("project/history", "Operations History")
+            &MenuItemBuilder::with_id("project/history", "操作历史")
                 .accelerator("CmdOrCtrl+Shift+H")
                 .build(handle)?,
         )
         .separator()
-        .text("project/open-in-vscode", "Open in Editor")
-        .text("project/open-in-terminal", "Open in Terminal");
+        .text("project/open-in-vscode", "在编辑器中打开")
+        .text("project/open-in-terminal", "在终端中打开");
 
     #[cfg(target_os = "macos")]
     {
-        project_menu_builder =
-            project_menu_builder.text("project/show-in-finder", "Show in Finder");
+        project_menu_builder = project_menu_builder.text("project/show-in-finder", "在访达中显示");
     }
 
     #[cfg(target_os = "windows")]
     {
         project_menu_builder =
-            project_menu_builder.text("project/show-in-finder", "Show in Explorer");
+            project_menu_builder.text("project/show-in-finder", "在资源管理器中显示");
     }
 
     #[cfg(target_os = "linux")]
     {
         project_menu_builder =
-            project_menu_builder.text("project/show-in-finder", "Show in File Manager");
+            project_menu_builder.text("project/show-in-finder", "在文件管理器中显示");
     }
 
     let project_menu = &project_menu_builder
         .separator()
-        .text("project/settings", "Project Settings")
+        .text("project/settings", "项目设置")
         .build()?;
 
     #[cfg(target_os = "macos")]
-    let window_menu = &SubmenuBuilder::new(handle, "Window")
+    let window_menu = &SubmenuBuilder::new(handle, "窗口")
         .items(&[
             &PredefinedMenuItem::minimize(handle, None)?,
             &PredefinedMenuItem::maximize(handle, None)?,
@@ -166,28 +166,33 @@ pub fn build<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         ])
         .build()?;
 
-    let help_menu = SubmenuBuilder::new(handle, "Help")
-        .text("help/documentation", "Documentation")
-        .text("help/debugging-guide", "Debugging Guide")
-        .text("help/github", "Source Code")
-        .text("help/release-notes", "Release Notes")
+    let help_menu_builder = SubmenuBuilder::new(handle, "帮助")
+        .text("help/open-logs-folder", "打开日志文件夹")
+        .text("help/open-config-folder", "打开配置文件夹")
+        .text("help/open-cache-folder", "打开缓存文件夹");
+
+    #[cfg(not(feature = "offline"))]
+    let help_menu_builder = help_menu_builder
         .separator()
-        .text("help/share-debug-info", "Share Debug Info…")
-        .text("help/report-issue", "Create an Issue")
+        .text("help/documentation", "在线文档")
+        .text("help/debugging-guide", "调试指南")
+        .text("help/github", "源代码")
+        .text("help/release-notes", "发行说明")
         .separator()
-        .text("help/open-logs-folder", "Open Logs Folder")
-        .text("help/open-config-folder", "Open Config Folder")
-        .text("help/open-cache-folder", "Open Cache Folder")
+        .text("help/share-debug-info", "分享调试信息…")
+        .text("help/report-issue", "提交问题")
         .separator()
         .text("help/discord", "Discord")
         .text("help/youtube", "YouTube")
         .text("help/bluesky", "Bluesky")
-        .text("help/x", "X")
+        .text("help/x", "X");
+
+    let help_menu = help_menu_builder
         .separator()
         .item(
             &MenuItemBuilder::with_id(
                 "help/version",
-                format!("Version {}", handle.package_info().version),
+                format!("版本 {}", handle.package_info().version),
             )
             .enabled(false)
             .build(handle)?,
@@ -217,6 +222,7 @@ pub fn handle_event(webview: &WebviewWindow, event: &MenuEvent) {
         return;
     }
 
+    #[cfg(not(feature = "offline"))]
     if event.id() == "file/clone-repo" {
         emit(webview, SHORTCUT_EVENT, "clone-repo");
         return;
@@ -274,6 +280,7 @@ pub fn handle_event(webview: &WebviewWindow, event: &MenuEvent) {
         return;
     }
 
+    #[cfg(not(feature = "offline"))]
     if event.id() == "help/share-debug-info" {
         emit(webview, SHORTCUT_EVENT, "share-debug-info");
         return;
@@ -309,6 +316,7 @@ pub fn handle_event(webview: &WebviewWindow, event: &MenuEvent) {
         return;
     }
 
+    #[cfg(not(any(feature = "disable-auto-updates", feature = "offline")))]
     if event.id() == "global/update" {
         emit(webview, SHORTCUT_EVENT, "update");
         return;
@@ -335,6 +343,7 @@ pub fn handle_event(webview: &WebviewWindow, event: &MenuEvent) {
         return;
     }
 
+    #[cfg(not(feature = "offline"))]
     'open_link: {
         let result = match event.id().0.as_str() {
             "help/documentation" => open::that("https://docs.gitbutler.com"),
@@ -362,7 +371,7 @@ pub fn handle_event(webview: &WebviewWindow, event: &MenuEvent) {
         return;
     }
 
-    tracing::error!("unhandled 'help' menu event: {}", event.id().0);
+    tracing::debug!("unhandled menu event: {}", event.id().0);
 }
 
 fn emit<R: Runtime>(window: &WebviewWindow<R>, event: &str, shortcut: &str) {

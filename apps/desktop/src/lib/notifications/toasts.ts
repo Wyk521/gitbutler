@@ -1,4 +1,3 @@
-import posthog from "posthog-js";
 import { writable, type Writable } from "svelte/store";
 import type { MessageStyle } from "@gitbutler/ui";
 
@@ -71,13 +70,6 @@ export function showWarning(
 	extraAction?: ExtraAction,
 	testId?: string,
 ) {
-	if (shouldCaptureToast()) {
-		posthog.capture("toast:show_warning", {
-			warning_test_id: testId,
-			warning_title: title,
-			warning_message: message,
-		});
-	}
 	showToast({ title, message, style: "warning", extraAction, testId });
 }
 

@@ -1,18 +1,12 @@
 <script lang="ts">
-	import { goto } from "$app/navigation";
 	import WelcomeAction from "$components/onboarding/WelcomeAction.svelte";
-	import AccessTokenSignIn from "$components/shared/AccessTokenSignIn.svelte";
-	import IconLink from "$components/shared/IconLink.svelte";
-	import cloneRepoSvg from "$lib/assets/welcome/clone-repo.svg?raw";
 	import newProjectSvg from "$lib/assets/welcome/new-local-project.svg?raw";
 	import { handleAddProjectOutcome } from "$lib/project/project";
 	import { PROJECTS_SERVICE } from "$lib/project/projectsService";
-	import { OnboardingEvent, POSTHOG_WRAPPER } from "$lib/telemetry/posthog";
 	import { inject } from "@gitbutler/core/context";
 	import { TestId } from "@gitbutler/ui";
 
 	const projectsService = inject(PROJECTS_SERVICE);
-	const posthog = inject(POSTHOG_WRAPPER);
 	const serverCapabilitiesQuery = $derived(projectsService.serverCapabilities());
 	const canAddProjects = $derived(serverCapabilitiesQuery.response?.canAddProjects ?? true);
 
@@ -25,24 +19,19 @@
 			const testDirectoryPath = directoryInputElement?.value;
 			const outcome = await projectsService.addProject(testDirectoryPath ?? "");
 
-			posthog.captureOnboarding(OnboardingEvent.AddLocalProject);
 			if (outcome) {
 				handleAddProjectOutcome(outcome);
 			}
 		} catch (e: unknown) {
-			posthog.captureOnboarding(OnboardingEvent.AddLocalProjectFailed, e);
 		} finally {
 			newProjectLoading = false;
 		}
 	}
 
-	async function onCloneProject() {
-		goto("/onboarding/clone");
-	}
 </script>
 
 <div class="welcome" data-testid={TestId.WelcomePage}>
-	<h1 class="welcome-title text-serif-42">Welcome to GitButler!</h1>
+	<h1 class="welcome-title text-serif-42">欢迎使用 RepoScope Desktop</h1>
 	<div class="welcome__actions">
 		<div class="welcome__actions--repo">
 			<input
@@ -53,7 +42,7 @@
 			/>
 			{#if canAddProjects}
 				<WelcomeAction
-					title="Add local project"
+					title="添加本机仓库"
 					loading={newProjectLoading}
 					onclick={onNewProject}
 					dimMessage
@@ -63,46 +52,10 @@
 						{@html newProjectSvg}
 					{/snippet}
 					{#snippet message()}
-						Should be a valid git repository
+						请选择有效的本机 Git 仓库
 					{/snippet}
 				</WelcomeAction>
 			{/if}
-			<WelcomeAction title="Clone repository" onclick={onCloneProject} dimMessage>
-				{#snippet icon()}
-					{@html cloneRepoSvg}
-				{/snippet}
-				{#snippet message()}
-					Clone a repo using a URL
-				{/snippet}
-			</WelcomeAction>
-		</div>
-		<!-- Using instance of user here to not hide after login -->
-		<AccessTokenSignIn />
-	</div>
-
-	<div class="links">
-		<div class="links__section">
-			<p class="links__title text-14 text-bold">Quick start</p>
-			<div class="education-links">
-				<IconLink
-					icon="docs"
-					href="https://docs.gitbutler.com/features/virtual-branches/branch-lanes"
-				>
-					GitButler docs
-				</IconLink>
-				<IconLink icon="youtube" href="https://www.youtube.com/@gitbutlerapp">
-					Watch tutorials
-				</IconLink>
-			</div>
-		</div>
-		<div class="links__section">
-			<p class="links__title text-14 text-bold">Join our community</p>
-			<div class="community-links">
-				<IconLink icon="discord" href="https://discord.gg/MmFkmaJ42D">Discord</IconLink>
-				<IconLink icon="bluesky" href="https://bsky.app/profile/gitbutler.com">Bluesky</IconLink>
-				<IconLink icon="instagram" href="https://www.instagram.com/gitbutler/">Instagram</IconLink>
-				<IconLink icon="youtube" href="https://www.youtube.com/@gitbutlerapp">YouTube</IconLink>
-			</div>
 		</div>
 	</div>
 </div>

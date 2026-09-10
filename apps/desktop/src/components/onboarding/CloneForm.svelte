@@ -2,23 +2,12 @@
 	import { goto } from "$app/navigation";
 	import SettingsSection from "$components/shared/SettingsSection.svelte";
 	import { BACKEND } from "$lib/backend";
-	import { parseError } from "$lib/error/parser";
-	import { GIT_SERVICE } from "$lib/git/gitService";
-	import { parseRemoteUrl } from "$lib/git/gitUrl";
-	import { handleAddProjectOutcome } from "$lib/project/project";
-	import { PROJECTS_SERVICE } from "$lib/project/projectsService";
-	import { projectPath } from "$lib/routes/routes.svelte";
-	import { OnboardingEvent, POSTHOG_WRAPPER } from "$lib/telemetry/posthog";
 	import { inject } from "@gitbutler/core/context";
 	import { persisted } from "@gitbutler/shared/persisted";
 	import { Button, InfoMessage, type MessageStyle, Spacer, Textbox } from "@gitbutler/ui";
 
-	import * as Sentry from "@sentry/sveltekit";
 	import { onMount } from "svelte";
 
-	const projectsService = inject(PROJECTS_SERVICE);
-	const gitService = inject(GIT_SERVICE);
-	const posthog = inject(POSTHOG_WRAPPER);
 	const backend = inject(BACKEND);
 
 	let loading = $state(false);
@@ -47,60 +36,11 @@
 		targetDirPath = Array.isArray(selectedPath) ? selectedPath[0] : selectedPath;
 	}
 
-	function getErrorMessage(error: unknown): string {
-		const parsedError = parseError(error);
-		if (parsedError.name && parsedError.name !== parsedError.message) {
-			return `${parsedError.name}: ${parsedError.message}`;
-		}
-		return parsedError.message;
-	}
-
-	async function cloneRepository() {
+	function cloneRepository() {
 		loading = true;
 		savedTargetDirPath.set(targetDirPath);
-		if (errors.length) {
-			errors = [];
-		}
-
-		if (!repositoryUrl || !targetDirPath) {
-			errors.push({
-				label: "You must add both a repository URL and target directory.",
-			});
-			loading = false;
-			return;
-		}
-
-		try {
-			const remoteUrl = parseRemoteUrl(repositoryUrl);
-			if (!remoteUrl) {
-				return;
-			}
-
-			const targetDir = await backend.joinPath(targetDirPath, remoteUrl.name);
-
-			await gitService.cloneRepo(repositoryUrl, targetDir);
-
-			posthog.captureOnboarding(OnboardingEvent.ClonedProject);
-			const outcome = await projectsService.addProject(targetDir);
-			if (!outcome) {
-				posthog.captureOnboarding(
-					OnboardingEvent.ClonedProjectFailed,
-					"Failed to add project after cloning",
-				);
-				throw new Error("Failed to add project after cloning.");
-			}
-
-			handleAddProjectOutcome(outcome, (project) => goto(projectPath(project.id)));
-		} catch (e) {
-			Sentry.captureException(e);
-			const errorMessage = getErrorMessage(e);
-			posthog.captureOnboarding(OnboardingEvent.ClonedProjectFailed, e);
-			errors.push({
-				label: errorMessage,
-			});
-		} finally {
-			loading = false;
-		}
+		errors = [{ label: "离线版本不支持远程克隆，请先在本机准备仓库后再添加。" }];
+		loading = false;
 	}
 
 	function handleCancel() {
@@ -112,31 +52,31 @@
 	}
 </script>
 
-<h1 class="clone-title text-serif-42">Clone a <i>repository</i></h1>
+<h1 class="clone-title text-serif-42">远程克隆已关闭</h1>
 <SettingsSection>
-	<Textbox label="Clone URL" bind:value={repositoryUrl} />
+	<Textbox label="远程仓库地址（已关闭）" bind:value={repositoryUrl} disabled />
 
 	<div class="clone__field repositoryTargetPath">
 		<Textbox
-			label="Where to clone"
+			label="克隆目录（仅作提示）"
 			bind:value={targetDirPath}
-			placeholder="/Users/tipsy/Documents"
+			placeholder="选择本机目录"
 		/>
-		<Button kind="outline" disabled={loading} onclick={handleCloneTargetSelect}>Choose..</Button>
+		<Button kind="outline" disabled={loading} onclick={handleCloneTargetSelect}>选择目录</Button>
 	</div>
 </SettingsSection>
 
 <Spacer dotted margin={24} />
 
 {#if completed}
-	{@render Notification({ title: "Success", style: "success" })}
+	{@render Notification({ title: "完成", style: "success" })}
 {/if}
 {#if errors.length}
-	{@render Notification({ title: "Error", items: errors, style: "danger" })}
+	{@render Notification({ title: "不可用", items: errors, style: "danger" })}
 {/if}
 
 <div class="clone__actions">
-	<Button kind="outline" disabled={loading} onclick={handleCancel}>Cancel</Button>
+	<Button kind="outline" disabled={loading} onclick={handleCancel}>返回</Button>
 	<Button
 		style="pop"
 		icon={errors.length > 0 ? "refresh" : "chevron-right"}
@@ -144,12 +84,12 @@
 		{loading}
 		onclick={cloneRepository}
 	>
-		{#if loading}
-			Cloning..
+			{#if loading}
+			处理中…
 		{:else if errors.length > 0}
-			Retry clone
+			重试提示
 		{:else}
-			Clone
+			远程克隆
 		{/if}
 	</Button>
 </div>

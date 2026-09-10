@@ -10,7 +10,6 @@
 	import { PROJECTS_SERVICE } from "$lib/project/projectsService";
 	import { SETTINGS_SERVICE } from "$lib/settings/appSettings";
 	import { combineResults } from "$lib/state/helpers";
-	import { OnboardingEvent, POSTHOG_WRAPPER } from "$lib/telemetry/posthog";
 	import { unique } from "$lib/utils/array";
 	import { inject } from "@gitbutler/core/context";
 	import {
@@ -19,7 +18,6 @@
 		Checkbox,
 		Icon,
 		InfoMessage,
-		Link,
 		Select,
 		SelectItem,
 		TestId,
@@ -39,7 +37,6 @@
 	const { projectId, projectName, remoteBranches, onBranchSelected, onOpenProject }: Props =
 		$props();
 
-	const posthog = inject(POSTHOG_WRAPPER);
 	const gitConfig = inject(GIT_CONFIG_SERVICE);
 	const settingsStore = inject(SETTINGS_SERVICE).appSettings;
 
@@ -76,9 +73,6 @@
 		loading = true;
 		targetError = undefined;
 		if (!targetWasSet) {
-			posthog.captureOnboarding(OnboardingEvent.ProjectSetupContinue, undefined, {
-				landDirectly: $landDirectly,
-			});
 			try {
 				await onBranchSelected([branch.name, remote]);
 				targetWasSet = true;
@@ -107,7 +101,7 @@
 <div class="project-setup">
 	<div class="stack-v gap-4">
 		<ProjectNameLabel {projectName} />
-		<h1 class="text-serif-42">Configure your <i>workspace</i></h1>
+		<h1 class="text-serif-42">配置你的<i>工作区</i></h1>
 	</div>
 
 	<div class="project-setup__fields">
@@ -120,7 +114,7 @@
 				onselect={(value) => {
 					selectedBranch = { name: value };
 				}}
-				label="Target branch"
+				label="目标分支"
 				searchable
 			>
 				{#snippet itemSnippet({ item, highlighted })}
@@ -131,10 +125,9 @@
 			</Select>
 
 			<p class="text-12 text-body project-setup__field-caption">
-				Your main "production" branch, typically <code class="code-string">origin/master</code> or
-				<code class="code-string">upstream/main</code>.
-				<br />
-				<Link href="https://docs.gitbutler.com/overview#target-branch">Learn more</Link>
+				用于对比和整合的主分支，通常是
+				<code class="code-string">origin/master</code> 或
+				<code class="code-string">upstream/main</code>。这里只读取本机已有的远程跟踪引用。
 			</p>
 		</div>
 
@@ -157,8 +150,7 @@
 				</Select>
 
 				<p class="text-12 text-body clr-text-2">
-					You have branches from multiple remotes. If you want to specify a remote for creating
-					branches that is different from the remote that your target branch is on, change it here.
+					检测到多个本机远程跟踪命名空间。可在这里选择新分支默认关联的本地远程名。
 				</p>
 			</div>
 		{/if}
@@ -178,14 +170,14 @@
 							{@html gerritLogoSvg}
 						{/snippet}
 						{#snippet title()}
-							Enable Gerrit project
+							启用 Gerrit 项目模式
 						{/snippet}
 						{#snippet caption()}
-							It looks like this project might be a Gerrit project.
+							该项目看起来可能使用 Gerrit。
 							<br />
-							Do you want to enable Gerrit mode?
+							是否启用 Gerrit 模式？
 							<br />
-							You can adjust this later in the project settings if needed.
+							之后可在项目设置中调整。
 						{/snippet}
 						{#snippet actions()}
 							<Toggle
@@ -204,7 +196,7 @@
 
 	<label for="landDirectly" class="land-directly">
 		<Checkbox name="landDirectly" small bind:checked={$landDirectly} />
-		<span class="text-12 clr-text-2">Push to main / Skip pull requests mode</span>
+		<span class="text-12 clr-text-2">直接整合到主分支（跳过评审流程）</span>
 	</label>
 
 	<!-- With the singleBranch feature flag, setting the target only updates project
@@ -243,7 +235,7 @@
 					</svg>
 
 					<h3 class="text-13 text-body text-semibold">
-						GitButler switches your active branch to <span class="text-bold"
+						RepoScope Desktop 会将活动分支切换到 <span class="text-bold"
 							>gitbutler/workspace</span
 						>
 					</h3>
@@ -251,13 +243,9 @@
 
 				{#if showMoreInfo}
 					<p class="text-12 text-body" transition:slide={{ duration: 200 }}>
-						In order to support working on multiple branches simultaneously, GitButler creates and
-						automatically manages a special branch <span class="text-bold">gitbutler/workspace</span
-						>. You can always switch back and forth as needed between normal git branches and the
-						Gitbutler workspace.
-						<Link href="https://docs.gitbutler.com/features/branch-management/integration-branch"
-							>Learn more</Link
-						>
+						为了同时管理多个分支，应用会创建并维护特殊分支
+						<span class="text-bold">gitbutler/workspace</span>。你仍可随时在普通 Git 分支和
+						工作区之间切换；RepoScope 分析不会写入这些引用。
 					</p>
 				{/if}
 			</div>
@@ -274,7 +262,7 @@
 	{/if}
 
 	<div class="action-buttons">
-		<Button kind="outline" disabled={loading} onclick={deleteProjectAndGoBack}>Cancel</Button>
+		<Button kind="outline" disabled={loading} onclick={deleteProjectAndGoBack}>取消</Button>
 		<Button
 			style="pop"
 			{loading}
@@ -283,7 +271,7 @@
 			testId={TestId.ProjectSetupPageTargetContinueButton}
 			id="set-base-branch"
 		>
-			{targetWasSet ? "Open project" : "Let's go"}
+			{targetWasSet ? "打开项目" : "继续"}
 		</Button>
 	</div>
 </div>

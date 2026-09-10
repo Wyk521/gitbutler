@@ -24,36 +24,20 @@
 	let releases = $state<Release[]>([]);
 	let currentReleaseIndex = $state(0);
 	let loadingReleases = $state(false);
+	const offline =
+		!import.meta.env.VITEST && import.meta.env.VITE_REPOSCOPE_OFFLINE !== "false";
 
 	$effect(() => {
 		({ version, releaseNotes, status } = $update);
 	});
 
-	async function fetchReleases() {
-		if (releases.length > 0) return; // Already fetched
-
-		loadingReleases = true;
-		try {
-			const response = await fetch(
-				"https://app.gitbutler.com/api/downloads?limit=10&channel=release",
-			);
-			const data = await response.json();
-			releases = data.map((r: any) => ({
-				version: r.version,
-				notes: r.notes,
-				released_at: r.released_at,
-			}));
-			// Set current release to the one from the updater if it matches
-			if (version) {
-				const index = releases.findIndex((r) => r.version === version);
-				if (index !== -1) {
-					currentReleaseIndex = index;
-				}
-			}
-		} catch (error) {
-			console.error("Failed to fetch releases:", error);
-		} finally {
-			loadingReleases = false;
+	function fetchReleases() {
+		// Release notes used to be fetched from GitButler's website.  RepoScope
+		// Desktop is offline by design, so the updater surface can only show the
+		// notes bundled with the local update event.
+		if (offline || releases.length > 0) return;
+		if (version && releaseNotes) {
+			releases = [{ version, notes: releaseNotes, released_at: "" }];
 		}
 	}
 

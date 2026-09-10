@@ -2,23 +2,19 @@
 	import "@gitbutler/design-core/utility";
 	import "@gitbutler/design-core/core";
 	import "../styles/styles.css";
-	import { browser, dev } from "$app/environment";
-	import { afterNavigate, beforeNavigate } from "$app/navigation";
+	import { dev } from "$app/environment";
 	import { page } from "$app/state";
 	import GlobalSettingsShortcutHandler from "$components/settings/GlobalSettingsShortcutHandler.svelte";
 	import ReloadShortcutHandler from "$components/settings/ReloadShortcutHandler.svelte";
 	import ThemeShortcutHandler from "$components/settings/ThemeShortcutHandler.svelte";
 	import ToggleSidebarShortcutHandler from "$components/settings/ToggleSidebarShortcutHandler.svelte";
 	import ZoomShortcutHandler from "$components/settings/ZoomShortcutHandler.svelte";
-	import AppUpdater from "$components/shared/AppUpdater.svelte";
 	import FocusCursor from "$components/shared/FocusCursor.svelte";
 	import GitInputPrompt from "$components/shared/GitInputPrompt.svelte";
 	import ReloadWarning from "$components/shared/ReloadWarning.svelte";
-	import ShareIssueModal from "$components/shared/ShareIssueModal.svelte";
 	import ToastController from "$components/shared/ToastController.svelte";
 	import GlobalModalRouter from "$components/views/GlobalModalRouter.svelte";
 	import { initDependencies } from "$lib/bootstrap/deps";
-	import { GIT_CONFIG_SERVICE } from "$lib/config/gitConfigService";
 	import { fModeEnabled } from "$lib/config/uiFeatureFlags";
 	import { PROJECTS_SERVICE } from "$lib/project/projectsService";
 	import { TERMINAL_SERVICE } from "$lib/settings/terminalService";
@@ -26,8 +22,6 @@
 	import { SHORTCUT_SERVICE } from "$lib/shortcuts/shortcutService";
 	import { CLIENT_STATE } from "$lib/state/clientState.svelte";
 	import { initUserSettings, UI_STATE } from "$lib/state/uiState.svelte";
-	import { POSTHOG_WRAPPER } from "$lib/telemetry/posthog";
-	import { USER_SERVICE } from "$lib/user/userService.svelte";
 	import { inject } from "@gitbutler/core/context";
 	import { ChipToastContainer } from "@gitbutler/ui";
 	import { FOCUS_MANAGER } from "@gitbutler/ui/focus/focusManager";
@@ -45,7 +39,6 @@
 	initDependencies(untrack(() => data));
 
 	const clientState = inject(CLIENT_STATE);
-	const posthog = inject(POSTHOG_WRAPPER);
 	const uiState = inject(UI_STATE);
 	const terminalService = inject(TERMINAL_SERVICE);
 
@@ -56,30 +49,6 @@
 	// =============================================================================
 	// CORE REACTIVE STATE & EFFECTS
 	// =============================================================================
-
-	const userService = inject(USER_SERVICE);
-
-	let coldstartLinks = $state<string[] | undefined>(undefined);
-	backend
-		.getColdStartDeepLinkUrls()
-		.then((result) => (coldstartLinks = result))
-		.catch(() => (coldstartLinks = []));
-
-	$effect(() => {
-		if (coldstartLinks !== undefined) {
-			backend.initDeepLinking(
-				{
-					open: (path: string, newWindow: boolean) => {
-						projectsService.handleDeepLinkOpen(path, newWindow);
-					},
-					login: (accessToken: string) => {
-						userService.setUserAccessToken(accessToken);
-					},
-				},
-				coldstartLinks,
-			);
-		}
-	});
 
 	// Project tracking
 	const projectsService = inject(PROJECTS_SERVICE);
@@ -92,22 +61,6 @@
 	// Keyboard shortcuts
 	const shortcutService = inject(SHORTCUT_SERVICE);
 	$effect(() => shortcutService.listen());
-
-	// =============================================================================
-	// ANALYTICS & NAVIGATION
-	// =============================================================================
-
-	const gitConfig = inject(GIT_CONFIG_SERVICE);
-
-	if (browser) {
-		beforeNavigate(() => posthog.capture("$pageleave"));
-		afterNavigate(() => {
-			// Invalidate the git config on every navigation to ensure we have the latest
-			// (in case the user changed something outside of GitButler)
-			gitConfig.invalidateGitConfig();
-			posthog.capture("$pageview");
-		});
-	}
 
 	// =============================================================================
 	// DEBUG & DEVELOPMENT TOOLS
@@ -127,6 +80,24 @@
 			e.preventDefault();
 		} else {
 			handleKeyBind(e);
+		}
+	}
+
+	function blockOfflineNavigation(event: MouseEvent) {
+		if (import.meta.env.VITEST || import.meta.env.VITE_REPOSCOPE_OFFLINE === "false") return;
+		const element = event.target;
+		if (!(element instanceof Element)) return;
+		const anchor = element.closest("a");
+		const href = anchor?.getAttribute("href");
+		if (!href) return;
+		try {
+			const url = new URL(href, window.location.href);
+			if (["http:", "https:", "ws:", "wss:", "mailto:"].includes(url.protocol)) {
+				event.preventDefault();
+				event.stopPropagation();
+			}
+		} catch {
+			// Invalid links are left to the browser's normal error handling.
 		}
 	}
 
@@ -160,20 +131,19 @@
 <svelte:window
 	ondrop={(e) => e.preventDefault()}
 	ondragover={(e) => e.preventDefault()}
+	onclick={blockOfflineNavigation}
 	onkeydown={handleKeyDown}
 />
 
 <svelte:head>
-	<title>GitButler</title>
+	<title>RepoScope Desktop</title>
 </svelte:head>
 
 <div class="app-root" role="application" oncontextmenu={(e) => !dev && e.preventDefault()}>
 	{@render children()}
 </div>
-<ShareIssueModal />
 <ToastController />
 <ChipToastContainer />
-<AppUpdater />
 <GitInputPrompt />
 <ZoomShortcutHandler />
 <GlobalSettingsShortcutHandler />

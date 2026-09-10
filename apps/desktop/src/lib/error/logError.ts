@@ -1,8 +1,7 @@
 import { SilentError } from "$lib/error/error";
-import { isNormalizedError, normalizedErrorToException } from "$lib/error/normalizedError";
 import { parseError } from "$lib/error/parser";
+import { redactSensitiveText } from "$lib/error/redact";
 import { showError } from "$lib/error/showError";
-import { captureException } from "@sentry/sveltekit";
 
 // Lazy-import logErrorToFile to avoid circular dependency with backend/.
 let _logErrorToFile: ((error: string) => void) | undefined;
@@ -33,20 +32,21 @@ function shouldIgnoreError(error: unknown): boolean {
 }
 
 function loggableError(error: unknown): string {
+	let message: string;
 	if (error instanceof Error) {
-		return error.message;
-	}
-
-	if (typeof error === "string") {
-		return error;
-	}
-	if (typeof error === "object" && error !== null) {
+		message = error.message;
+	} else if (typeof error === "string") {
+		message = error;
+	} else if (typeof error === "object" && error !== null) {
 		if ("message" in error && typeof error.message === "string") {
-			return error.message;
+			message = error.message;
+		} else {
+			message = JSON.stringify(error) ?? String(error);
 		}
-		return JSON.stringify(error);
+	} else {
+		message = String(error);
 	}
-	return String(error);
+	return redactSensitiveText(message);
 }
 
 type LogErrorOptions = {
@@ -74,23 +74,9 @@ export function logError(error: unknown, options?: LogErrorOptions) {
 
 		if (!silent) {
 			if (options?.skipToast) {
-				// Sentry-only path (e.g. Svelte `<ErrorBoundary>`): no toast
-				// will be shown, so capture directly here. `showError`
-				// handles the same wrapping in the toast-bearing path
-				// below.
-				const forSentry =
-					isNormalizedError(error) && !(error instanceof Error)
-						? normalizedErrorToException(error)
-						: error;
-				captureException(forSentry, {
-					mechanism: {
-						type: "sveltekit",
-						handled: false,
-					},
-				});
+				// The offline build has no remote error collector.  Callers that
+				// request a silent path intentionally receive no toast either.
 			} else {
-				// `showError` captures to PostHog and Sentry itself, so the
-				// toast pipeline and the telemetry stay in sync.
 				showError("Unhandled exception", error);
 			}
 		}
@@ -98,7 +84,7 @@ export function logError(error: unknown, options?: LogErrorOptions) {
 		const logMessage = loggableError(error);
 		_logErrorToFile?.(logMessage);
 
-		console.error(error);
+		console.error(logMessage);
 	} catch (err: unknown) {
 		console.error("Error while trying to log error.", err);
 	}

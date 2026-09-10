@@ -1,59 +1,27 @@
 <script lang="ts">
-	import ReduxResult from "$components/shared/ReduxResult.svelte";
 	import SettingsSection from "$components/shared/SettingsSection.svelte";
-	import { projectRunCommitHooks } from "$lib/config/config";
-	import { PROJECTS_SERVICE } from "$lib/project/projectsService";
-	import { inject } from "@gitbutler/core/context";
-	import { CardGroup, Toggle } from "@gitbutler/ui";
-	import type { Project } from "$lib/project/project";
+	import { CardGroup } from "@gitbutler/ui";
 
 	const { projectId }: { projectId: string } = $props();
-	const runCommitHooks = $derived(projectRunCommitHooks(projectId));
-	const projectsService = inject(PROJECTS_SERVICE);
-	const projectQuery = $derived(projectsService.getProject(projectId));
-
-	async function onHuskyHooksEnabledClick(project: Project, value: boolean) {
-		await projectsService.updateProject({ ...project, husky_hooks_enabled: value });
-	}
+	void projectId;
 </script>
 
 <SettingsSection>
 	<CardGroup>
-		<CardGroup.Item labelFor="runHooks">
-			{#snippet title()}
-				Run Git hooks
-			{/snippet}
-			{#snippet caption()}
-				Enable running git hooks (pre-push, pre/post-commit, commit-msg) during GitButler actions.
-			{/snippet}
-			{#snippet actions()}
-				<Toggle id="runHooks" bind:checked={$runCommitHooks} />
-			{/snippet}
+		<CardGroup.Item>
+			{#snippet title()}仓库自定义 Hooks{/snippet}
+			{#snippet caption()}严格离线版本不会执行仓库中的 pre-commit、post-commit、commit-msg、pre-push 或 Husky 脚本；GitButler 内置工作区保护仍然有效。{/snippet}
+			{#snippet actions()}<span class="disabled-pill">已禁用</span>{/snippet}
 		</CardGroup.Item>
 	</CardGroup>
-
-	<ReduxResult {projectId} result={projectQuery.result}>
-		{#snippet children(project)}
-			<CardGroup>
-				<CardGroup.Item labelFor="huskyHooks">
-					{#snippet title()}
-						Enable Husky hooks
-					{/snippet}
-					{#snippet caption()}
-						⚠️ Only enable this for repositories you trust.
-						<br />
-						Allow GitButler to execute scripts from `.husky` (which can come from the repository). Hooks
-						in `.git/hooks` are unaffected.
-					{/snippet}
-					{#snippet actions()}
-						<Toggle
-							id="huskyHooks"
-							checked={project.husky_hooks_enabled}
-							onchange={(checked) => onHuskyHooksEnabledClick(project, checked)}
-						/>
-					{/snippet}
-				</CardGroup.Item>
-			</CardGroup>
-		{/snippet}
-	</ReduxResult>
 </SettingsSection>
+
+<style>
+	.disabled-pill {
+		padding: 4px 8px;
+		border-radius: 999px;
+		background: var(--bg-2);
+		color: var(--text-3);
+		font-size: 12px;
+	}
+</style>

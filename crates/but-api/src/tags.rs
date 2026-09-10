@@ -93,6 +93,8 @@ cache_tags! {
     Projects,
     /// The app's AI provider configuration.
     AiConfiguration,
+    /// RepoScope's active analysis batch and report snapshots.
+    RepoScopeAnalysis,
     /// Which mode the repository is in (open workspace, edit mode, ...) and
     /// the edit session's own state.
     OperatingMode,

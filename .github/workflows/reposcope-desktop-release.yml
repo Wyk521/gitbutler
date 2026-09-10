@@ -1,0 +1,120 @@
+name: RepoScope Desktop Windows Release
+
+on:
+  push:
+    tags:
+      - "reposcope-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Windows 发布版本，例如 0.1.0"
+        required: true
+        default: "0.1.0"
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-windows:
+    name: Build Windows x64 MSI
+    runs-on: windows-latest
+    outputs:
+      release_version: ${{ steps.resolve-version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: reposcope-desktop-windows
+
+      - name: Resolve release version
+        id: resolve-version
+        shell: pwsh
+        env:
+          RELEASE_INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq "workflow_dispatch") {
+            $version = $env:RELEASE_INPUT_VERSION
+          } else {
+            $version = $env:GITHUB_REF_NAME -replace '^reposcope-v', ''
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "版本号必须符合 SemVer：$version"
+          }
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Generate SDK and build MSI
+        shell: pwsh
+        run: |
+          pnpm build:sdk
+
+          $sourceConfigPath = Join-Path $env:GITHUB_WORKSPACE "crates/gitbutler-tauri/tauri.conf.release.json"
+          $versionConfigPath = Join-Path $env:RUNNER_TEMP "reposcope-tauri-version.json"
+          $config = Get-Content -LiteralPath $sourceConfigPath -Raw | ConvertFrom-Json
+          $config | Add-Member -NotePropertyName version -NotePropertyValue $env:RELEASE_VERSION -Force
+          $config | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $versionConfigPath -Encoding utf8
+
+          pnpm exec tauri build --config $versionConfigPath --features offline
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: RepoScope-Desktop-Windows-${{ env.RELEASE_VERSION }}
+          path: target/release/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download MSI
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: RepoScope-Desktop-Windows-${{ needs.build-windows.outputs.release_version || inputs.version || github.ref_name }}
+          path: release
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            version="${INPUT_VERSION}"
+            tag="reposcope-v${version}"
+          else
+            tag="${GITHUB_REF_NAME}"
+            version="${tag#reposcope-v}"
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" release/*.msi --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$tag" release/*.msi \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "RepoScope Desktop $version" \
+              --generate-notes
+          fi

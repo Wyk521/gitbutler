@@ -1,16 +1,30 @@
 import { parseQueryError } from "$lib/error/error";
 import { InjectionToken } from "@gitbutler/core/context";
-import { posthog, type PostHog, type Properties } from "posthog-js";
 import type { IBackend } from "$lib/backend";
 import type { RepoInfo } from "$lib/git/gitUrl";
 import type { SettingsService } from "$lib/settings/appSettings";
 import type { EventContext } from "$lib/telemetry/eventContext";
-import { PUBLIC_POSTHOG_API_KEY } from "$env/static/public";
+
+/**
+ * Kept deliberately small so legacy callers and tests can still provide a
+ * sink, while the desktop product itself has no telemetry SDK or network
+ * transport.  The production instance is never populated.
+ */
+export type Properties = Record<string, unknown>;
+
+type TelemetrySink = {
+	capture: (eventName: string, properties?: Properties, options?: unknown) => void;
+	identify?: (distinctId: string, properties?: Properties) => void;
+	get_distinct_id?: () => string;
+	reset?: () => void;
+	register_for_session?: (key: string, value: unknown) => void;
+	unregister_for_session?: (key: string) => void;
+};
 
 export const POSTHOG_WRAPPER = new InjectionToken<PostHogWrapper>("PostHogWrapper");
 
 export class PostHogWrapper {
-	private _instance: PostHog | void = undefined;
+	private _instance: TelemetrySink | void = undefined;
 
 	constructor(
 		private settingsService: SettingsService,
@@ -51,29 +65,14 @@ export class PostHogWrapper {
 	}
 
 	async init() {
-		if (this._instance) return;
-		const appInfo = await this.backend.getAppInfo();
-		this._instance = posthog.init(PUBLIC_POSTHOG_API_KEY, {
-			api_host: "https://eu.posthog.com",
-			autocapture: false,
-			disable_session_recording: true,
-			capture_performance: false,
-			request_batching: true,
-			persistence: "localStorage",
-			on_xhr_error: (e) => {
-				console.error("posthog error", e);
-			},
-		});
-		posthog.register({
-			appName: appInfo.name,
-			appVersion: appInfo.version,
-		});
+		// RepoScope Desktop is offline by construction.  This method remains an
+		// async no-op for old settings/onboarding call sites.
 	}
 
 	async setPostHogUser(params: { id: number; email?: string; name?: string }) {
 		const { id, email, name } = params;
 		const distinctId = `user_${id}`;
-		this._instance?.identify(distinctId, {
+		this._instance?.identify?.(distinctId, {
 			email,
 			name,
 		});
@@ -82,14 +81,14 @@ export class PostHogWrapper {
 
 	setAnonymousPostHogUser() {
 		if (this._instance) {
-			const distinctId = this._instance.get_distinct_id();
-			this.settingsService.updateTelemetryDistinctId(distinctId);
+			const distinctId = this._instance.get_distinct_id?.();
+			if (distinctId) this.settingsService.updateTelemetryDistinctId(distinctId);
 		}
 	}
 
 	async resetPostHog() {
 		this._instance?.capture("logout");
-		this._instance?.reset();
+		this._instance?.reset?.();
 		await this.settingsService.updateTelemetryDistinctId(null);
 	}
 
@@ -99,10 +98,11 @@ export class PostHogWrapper {
 	 */
 	setPostHogRepo(repo: RepoInfo | undefined) {
 		if (repo) {
-			this._instance?.register_for_session({ repoDomain: repo.domain, repoHash: repo.hash });
+			this._instance?.register_for_session?.("repoDomain", repo.domain);
+			this._instance?.register_for_session?.("repoHash", repo.hash);
 		} else {
-			this._instance?.unregister_for_session("repoDomain");
-			this._instance?.unregister_for_session("repoHash");
+			this._instance?.unregister_for_session?.("repoDomain");
+			this._instance?.unregister_for_session?.("repoHash");
 		}
 	}
 }

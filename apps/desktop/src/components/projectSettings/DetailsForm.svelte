@@ -14,12 +14,12 @@
 	<ReduxResult {projectId} result={projectQuery.result}>
 		{#snippet children(project)}
 			<div class="fields-wrapper">
-				<Textbox label="Project path" readonly id="path" value={project?.path} />
+				<Textbox label="项目路径" readonly id="path" value={project?.path} />
 				<div class="description-wrapper">
 					<Textbox
-						label="Project name"
+						label="项目名称"
 						id="name"
-						placeholder="Project name can't be empty"
+						placeholder="项目名称不能为空"
 						value={project.title}
 						required
 						onchange={(value: string) => {
@@ -30,7 +30,7 @@
 						id="description"
 						minRows={3}
 						maxRows={6}
-						placeholder="Project description"
+						placeholder="项目描述"
 						value={project.description}
 						oninput={(e: Event) => {
 							const target = e.currentTarget as HTMLTextAreaElement;

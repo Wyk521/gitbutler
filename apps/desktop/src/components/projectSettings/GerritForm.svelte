@@ -3,7 +3,7 @@
 	import { GIT_CONFIG_SERVICE } from "$lib/config/gitConfigService";
 	import { PROJECTS_SERVICE } from "$lib/project/projectsService";
 	import { inject } from "@gitbutler/core/context";
-	import { CardGroup, Link, Toggle } from "@gitbutler/ui";
+	import { CardGroup, Toggle } from "@gitbutler/ui";
 
 	type Props = {
 		projectId: string;
@@ -20,14 +20,13 @@
 <div class="stack-v">
 	<ReduxResult {projectId} result={isGerritProject.result}>
 		{#snippet children(itIsAGerritProject)}
-			<CardGroup.Item standalone labelFor="gerritModeToggle">
-				{#snippet title()}
-					Gerrit configuration
-				{/snippet}
+		<CardGroup.Item standalone labelFor="gerritModeToggle">
+			{#snippet title()}
+				Gerrit 配置
+			{/snippet}
 
-				{#snippet caption()}
-					Enable or disable Gerrit mode for this project.
-					<Link href="https://docs.gitbutler.com/features/gerrit-mode">Learn more</Link>
+			{#snippet caption()}
+				为该项目启用或禁用 Gerrit 模式。设置只保存在本机。
 				{/snippet}
 
 				{#snippet actions()}

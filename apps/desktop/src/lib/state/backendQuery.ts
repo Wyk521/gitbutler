@@ -5,6 +5,7 @@ import { type BaseQueryApi, type QueryReturnValue } from "@reduxjs/toolkit/query
 import type { ExtraOptions } from "$lib/state/butlerModule";
 
 import type { BaseQueryFn } from "@reduxjs/toolkit/query";
+import { isOfflineCommand } from "$lib/backend/offline";
 
 export type TauriExtraOptions = ExtraOptions & { command?: string };
 export type TauriBaseQueryFn = BaseQueryFn<ApiArgs, unknown, unknown, TauriExtraOptions>;
@@ -18,6 +19,9 @@ export const tauriBaseQuery: TauriBaseQueryFn = async (
 	const command = extra.command;
 	if (!command) {
 		return newError("Expected a command!");
+	}
+	if (isOfflineCommand(command)) {
+		return newError(`RepoScope Desktop 离线模式已禁用命令：${command}`);
 	}
 
 	if (!hasBackendExtra(api.extra)) {

@@ -1,5 +1,17 @@
 import type { Code } from "@gitbutler/but-sdk";
-import type { ErrorEvent, EventHint } from "@sentry/sveltekit";
+import { redactSensitiveText } from "$lib/error/redact";
+
+/** Minimal event shape retained for compatibility with the old error tests.
+ * RepoScope Desktop does not ship an error telemetry SDK. */
+export type ErrorEvent = {
+	type?: string;
+	fingerprint?: string[];
+};
+
+/** Minimal hint shape used by the local redaction/fingerprinting tests. */
+export type EventHint = {
+	originalException?: unknown;
+};
 
 /**
  * Canonical shape any error takes once it has crossed a boundary
@@ -94,16 +106,22 @@ export class IpcError extends Error implements NormalizedError {
 	readonly fingerprint: readonly string[];
 
 	constructor(raw: NormalizedError, command: string) {
-		super(raw.message);
+		const safeMessage = redactSensitiveText(raw.message);
+		super(safeMessage);
 		this.name = raw.name ?? `API error: (${command})`;
 		// `Error.prototype.message` set via `super()` is a non-enumerable own
 		// property, so `JSON.stringify(err)` would drop it — and any consumer
 		// that captures `{error: ipcError}` to PostHog or similar would lose
 		// the message. Redefine as enumerable to match the plain-object
 		// shape callers used to see.
-		this.message = raw.message;
+		Object.defineProperty(this, "message", {
+			value: safeMessage,
+			enumerable: true,
+			configurable: true,
+			writable: true,
+		});
 		this.code = raw.code;
-		this.fingerprint = ["ipc", command, normalizeForFingerprint(raw.message)];
+		this.fingerprint = ["ipc", command, normalizeForFingerprint(safeMessage)];
 	}
 }
 
@@ -119,7 +137,7 @@ export function normalizedErrorToException(error: {
 	code?: string;
 	fingerprint?: readonly string[];
 }): Error {
-	const err = new Error(error.message);
+	const err = new Error(redactSensitiveText(error.message));
 	// Prefer the backend-provided name (e.g. "API error: (workspace_branch_and_ancestors_push)") over
 	// the default "Error" so Sentry's title grouping matches the PostHog
 	// taxonomy we already filter by.

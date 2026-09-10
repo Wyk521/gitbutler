@@ -34,6 +34,18 @@ export function isHistoryPath() {
 	return isUrl<{ projectId: string }>("/[projectId]/history");
 }
 
+export function insightsPath(projectId: string) {
+	return `/${projectId}/insights`;
+}
+
+export function isInsightsPath() {
+	const projectId = page.params.projectId;
+	return (
+		typeof projectId === "string" &&
+		page.url.pathname.startsWith(`/${projectId}/insights`)
+	);
+}
+
 export function branchesPath(projectId: string) {
 	return `/${projectId}/branches`;
 }

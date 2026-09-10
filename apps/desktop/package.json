@@ -20,7 +20,6 @@
 		"prepare": "svelte-kit sync"
 	},
 	"devDependencies": {
-		"@anthropic-ai/sdk": "^0.91.1",
 		"@gitbutler/but-sdk": "workspace:*",
 		"@gitbutler/core": "workspace:*",
 		"@gitbutler/design-core": "2.2.2",
@@ -28,7 +27,6 @@
 		"@gitbutler/svelte-comment-injector": "workspace:*",
 		"@gitbutler/ui": "workspace:*",
 		"@reduxjs/toolkit": "catalog:redux",
-		"@sentry/sveltekit": "catalog:svelte",
 		"@sveltejs/adapter-static": "catalog:svelte",
 		"@sveltejs/kit": "catalog:svelte",
 		"@sveltejs/vite-plugin-svelte": "catalog:svelte",
@@ -38,9 +36,7 @@
 		"@tauri-apps/plugin-log": "^2.8.0",
 		"@tauri-apps/plugin-os": "^2.3.2",
 		"@tauri-apps/plugin-process": "^2.3.1",
-		"@tauri-apps/plugin-shell": "^2.3.5",
 		"@tauri-apps/plugin-store": "^2.4.3",
-		"@tauri-apps/plugin-updater": "^2.10.1",
 		"@testing-library/jest-dom": "^6.6.4",
 		"@testing-library/svelte": "5.3.1",
 		"@testing-library/user-event": "^14.6.1",
@@ -67,7 +63,6 @@
 		"postcss-load-config": "catalog:postcss",
 		"postcss-nesting": "catalog:postcss",
 		"postcss-pxtorem": "catalog:postcss",
-		"posthog-js": "1.417.1",
 		"sass-embedded": "^1.98.0",
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
@@ -79,10 +74,7 @@
 	},
 	"dependencies": {
 		"@tauri-apps/plugin-clipboard-manager": "^2.3.2",
-		"@tauri-apps/plugin-deep-link": "~2.4.9",
 		"dayjs": "^1.11.20",
-		"ollama": "^0.6.3",
-		"openai": "^6.32.0",
 		"reconnecting-websocket": "^4.4.0",
 		"redux-persist": "^6.0.0",
 		"rxjs": "catalog:"

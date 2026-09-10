@@ -1,6 +1,6 @@
 {
-	"productName": "GitButler Test",
-	"identifier": "com.gitbutler.app.test",
+	"productName": "RepoScope Desktop Test",
+	"identifier": "com.reposcope.desktop.test",
 	"build": {
 		"beforeBuildCommand": "[ \"$CI\" = \"true\" ] || pnpm build:desktop -- --mode development && cargo build -p gitbutler-git"
 	}

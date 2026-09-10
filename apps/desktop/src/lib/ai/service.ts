@@ -40,6 +40,10 @@ import type { HttpClient } from "@gitbutler/shared/network/httpClient";
 const maxDiffLengthLimitForAPI = 5000;
 const prDescriptionTokenLimit = 4096;
 
+function offlineBuild(): boolean {
+	return !import.meta.env.VITEST && import.meta.env.VITE_REPOSCOPE_OFFLINE !== "false";
+}
+
 export enum KeyOption {
 	BringYourOwn = "bringYourOwn",
 	ButlerAPI = "butlerAPI",
@@ -266,6 +270,7 @@ export class AIService {
 	}
 
 	async validateConfiguration(): Promise<boolean> {
+		if (offlineBuild()) return false;
 		const modelKind = await this.getModelKind();
 		const ollamaEndpoint = await this.getOllamaEndpoint();
 		const ollamaModelName = await this.getOllamaModelName();
@@ -295,6 +300,7 @@ export class AIService {
 	}
 
 	async validateGitButlerAPIConfiguration(): Promise<boolean> {
+		if (offlineBuild()) return false;
 		if (!(await this.usingGitButlerAPI())) {
 			return false;
 		}
@@ -305,6 +311,9 @@ export class AIService {
 	// Firstly, if the user has opted to use the GB API and isn't logged in, it will return undefined
 	// Secondly, if the user has opted to bring their own key but hasn't provided one, it will return undefined
 	async buildClient(): Promise<AIClient | undefined> {
+		if (offlineBuild()) {
+			throw new Error("RepoScope Desktop 离线模式已禁用 AI 功能");
+		}
 		const modelKind = await this.getModelKind();
 
 		if (await this.usingGitButlerAPI()) {

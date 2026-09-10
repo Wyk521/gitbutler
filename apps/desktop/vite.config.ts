@@ -1,4 +1,3 @@
-import { sentrySvelteKit } from "@sentry/sveltekit";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
 import { defineConfig, type Plugin } from "vitest/config";
@@ -6,31 +5,6 @@ import { defineConfig, type Plugin } from "vitest/config";
 export default defineConfig({
 	plugins: [
 		process.env.VITE_DEBOUNCE_RELOAD ? debounceReload() : undefined,
-		sentrySvelteKit({
-			adapter: "other",
-			autoInstrument: {
-				load: true,
-				serverLoad: false,
-			},
-			sourceMapsUploadOptions: {
-				org: "gitbutler",
-				project: "app-js",
-				authToken: process.env.SENTRY_AUTH_TOKEN,
-				telemetry: false,
-				unstable_sentryVitePluginOptions: {
-					telemetry: false,
-					release: {
-						name: process.env.SENTRY_RELEASE,
-						create: true,
-						setCommits: {
-							auto: true,
-							ignoreMissing: true,
-							ignoreEmpty: true,
-						},
-					},
-				},
-			},
-		}),
 		sveltekit(),
 		svelteTesting(),
 	],

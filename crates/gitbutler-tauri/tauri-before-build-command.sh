@@ -10,10 +10,8 @@ else
 fi
 
 set -x
-cargo build --release -p gitbutler-git
-if [ "${OS:-}" == "windows" ] || [ "${OS:-}" == "linux" ]; then
-  # NOTE: Should run either if the builtin-but feature is *not* selected in `release.sh` (case for Windows), OR if we
-  # need the standalone CLI for separate publishing (case for Linux)
-  cargo build --release -p but
-fi
-bash ./crates/gitbutler-tauri/inject-git-binaries.sh
+# RepoScope Desktop is a self-contained desktop application.  The upstream
+# build used this hook to compile and inject `but` and Git Askpass helper
+# binaries as Tauri `externalBin` entries.  Those helpers can initiate remote
+# Git traffic and are intentionally not part of the offline product.
+# Local GitButler operations use the in-process Rust APIs instead.

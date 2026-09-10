@@ -1,4 +1,6 @@
-use std::{fs, net::Ipv4Addr, path::Path, time::Duration};
+use std::{fs, path::Path};
+#[cfg(not(feature = "offline"))]
+use std::{net::Ipv4Addr, time::Duration};
 
 use tauri::{AppHandle, Manager};
 use tracing::{Level, instrument, metadata::LevelFilter, subscriber::set_global_default};
@@ -13,7 +15,7 @@ pub fn init(
 ) {
     fs::create_dir_all(logs_dir).expect("failed to create logs dir");
 
-    let log_prefix = "GitButler";
+    let log_prefix = "RepoScopeDesktop";
     let log_suffix = "log";
     let max_log_files = 14;
     remove_old_logs(logs_dir).ok();
@@ -45,6 +47,15 @@ pub fn init(
     let log_level = log_level_filter.into_level();
 
     let use_colors_in_logs = cfg!(not(feature = "windows"));
+    // The release product is strictly offline and must not start a local HTTP
+    // service either. Keep the Tokio console available only for explicitly
+    // non-offline development builds.
+    #[cfg(feature = "offline")]
+    let console_layer: Option<console_subscriber::ConsoleLayer> = None;
+    #[cfg(feature = "offline")]
+    let _ = enable_tokio_console_log;
+
+    #[cfg(not(feature = "offline"))]
     let console_layer = if enable_tokio_console_log {
         Some(
             console_subscriber::ConsoleLayer::builder()
@@ -108,12 +119,13 @@ fn should_log(level: Option<Level>, meta: &tracing::Metadata<'_>) -> bool {
     })
 }
 
+#[cfg(not(feature = "offline"))]
 fn get_server_addr(app_handle: &AppHandle) -> (Ipv4Addr, u16) {
     let config = app_handle.config();
     let product_name = config.product_name.as_ref().expect("product name not set");
-    let port = if product_name.eq("GitButler") {
+    let port = if product_name.eq("RepoScope Desktop") {
         6667
-    } else if product_name.eq("GitButler Nightly") {
+    } else if product_name.eq("RepoScope Desktop Nightly") {
         6668
     } else {
         6669

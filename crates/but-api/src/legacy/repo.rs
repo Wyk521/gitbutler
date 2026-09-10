@@ -7,7 +7,7 @@ use but_core::DiffSpec;
 use but_ctx::Context;
 use gitbutler_repo::{
     FileInfo, RepoCommands,
-    hooks::{self, HookResult, MessageHookResult},
+    hooks::{HookResult, MessageHookResult},
 };
 use tracing::instrument;
 
@@ -122,30 +122,62 @@ pub fn pre_commit_hook_diffspecs(
     ctx: &but_ctx::Context,
     changes: Vec<DiffSpec>,
 ) -> Result<HookResult> {
-    let repo = ctx.repo.get()?;
-    let head = repo
-        .head_tree_id_or_empty()
-        .context("Failed to get head tree")?;
+    #[cfg(feature = "offline")]
+    {
+        let _ = (ctx, changes);
+        // RepoScope Desktop deliberately does not execute repository-owned
+        // hooks.  GitButler's internal workspace protections remain in the
+        // mutation path; this compatibility endpoint reports no custom hook.
+        return Ok(HookResult::NotConfigured);
+    }
 
-    let context_lines = ctx.settings.context_lines;
+    #[cfg(not(feature = "offline"))]
+    {
+        let repo = ctx.repo.get()?;
+        let head = repo
+            .head_tree_id_or_empty()
+            .context("Failed to get head tree")?;
 
-    let mut changes = changes.into_iter().map(Ok).collect::<Vec<_>>();
+        let context_lines = ctx.settings.context_lines;
 
-    let (new_tree, ..) =
-        but_core::tree::apply_worktree_changes(head.detach(), &repo, &mut changes, context_lines)?;
+        let mut changes = changes.into_iter().map(Ok).collect::<Vec<_>>();
 
-    hooks::pre_commit_with_tree(ctx, new_tree.detach())
+        let (new_tree, ..) = but_core::tree::apply_worktree_changes(
+            head.detach(),
+            &repo,
+            &mut changes,
+            context_lines,
+        )?;
+
+        gitbutler_repo::hooks::pre_commit_with_tree(ctx, new_tree.detach())
+    }
 }
 #[but_api]
 #[instrument(err(Debug))]
 pub fn post_commit_hook(ctx: &but_ctx::Context) -> Result<HookResult> {
-    gitbutler_repo::hooks::post_commit(ctx)
+    #[cfg(feature = "offline")]
+    {
+        let _ = ctx;
+        return Ok(HookResult::NotConfigured);
+    }
+    #[cfg(not(feature = "offline"))]
+    {
+        gitbutler_repo::hooks::post_commit(ctx)
+    }
 }
 
 #[but_api]
 #[instrument(err(Debug))]
 pub fn message_hook(ctx: &but_ctx::Context, message: String) -> Result<MessageHookResult> {
-    gitbutler_repo::hooks::commit_msg(ctx, message)
+    #[cfg(feature = "offline")]
+    {
+        let _ = (ctx, message);
+        return Ok(MessageHookResult::NotConfigured);
+    }
+    #[cfg(not(feature = "offline"))]
+    {
+        gitbutler_repo::hooks::commit_msg(ctx, message)
+    }
 }
 
 #[but_api]

@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import CreateBranchModal from "$components/branch/CreateBranchModal.svelte";
-	import SyncButton from "$components/forge/SyncButton.svelte";
-	import IntegrateUpstreamModal from "$components/upstream/IntegrateUpstreamModal.svelte";
 	import { BACKEND } from "$lib/backend";
-	import { BASE_BRANCH_SERVICE } from "$lib/baseBranch/baseBranchService.svelte";
 	import { MODE_SERVICE } from "$lib/mode/modeService";
 	import { handleAddProjectOutcome } from "$lib/project/project";
 	import { PROJECTS_SERVICE } from "$lib/project/projectsService";
@@ -26,12 +23,9 @@
 	const projectsService = inject(PROJECTS_SERVICE);
 	const serverCapabilitiesQuery = $derived(projectsService.serverCapabilities());
 	const canAddProjects = $derived(serverCapabilitiesQuery.response?.canAddProjects ?? true);
-	const baseBranchService = inject(BASE_BRANCH_SERVICE);
 	const settingsService = inject(SETTINGS_SERVICE);
 	const modeService = inject(MODE_SERVICE);
 	const shortcutService = inject(SHORTCUT_SERVICE);
-	const baseReponse = $derived(projectId ? baseBranchService.baseBranch(projectId) : undefined);
-	const base = $derived(baseReponse?.response);
 	const settingsStore = $derived(settingsService.appSettings);
 	const singleBranchMode = $derived($settingsStore?.featureFlags.singleBranch ?? false);
 	const useCustomTitleBar = $derived(!($settingsStore?.ui.useNativeTitleBar ?? false));
@@ -42,7 +36,7 @@
 		if (currentMode?.type === "OpenWorkspace") {
 			return "gitbutler/workspace";
 		} else if (currentMode?.type === "OutsideWorkspace") {
-			return currentMode.subject.branchName || "detached HEAD";
+			return currentMode.subject.branchName || "游离 HEAD";
 		} else if (currentMode?.type === "Edit") {
 			return "gitbutler/edit";
 		}
@@ -52,23 +46,6 @@
 	const isNotInWorkspace = $derived(
 		currentMode?.type !== "OpenWorkspace" && currentMode?.type !== "Edit",
 	);
-	const isDetached = $derived(
-		currentMode?.type === "OutsideWorkspace" && currentMode.subject.branchName === null,
-	);
-	const [switchBackToWorkspace, workspaceSwitch] = baseBranchService.switchBackToWorkspace;
-
-	async function switchToWorkspace() {
-		if (base) {
-			await switchBackToWorkspace({
-				projectId,
-			});
-		}
-	}
-
-	const upstreamCommits = $derived(base?.behind ?? 0);
-	const isHasUpstreamCommits = $derived(upstreamCommits > 0);
-
-	let modal = $state<ReturnType<typeof IntegrateUpstreamModal>>();
 
 	const projects = $derived(projectsService.projects());
 
@@ -96,9 +73,9 @@
 		}
 
 		return [
-			{ header: "Recent" },
+			{ header: "最近使用" },
 			...recent.map((project) => ({ value: project.id, label: project.title })),
-			{ header: "Other projects" },
+			{ header: "其他项目" },
 			...others.map((project) => ({ value: project.id, label: project.title })),
 		];
 	});
@@ -146,10 +123,6 @@
 
 	const isOnWorkspacePage = $derived(!!isWorkspacePath());
 
-	function openModal() {
-		modal?.show();
-	}
-
 	let createBranchModal = $state<CreateBranchModal>();
 
 	$effect(() => shortcutService.on("create-branch", () => createBranchModal?.show()));
@@ -157,10 +130,6 @@
 		shortcutService.on("create-dependent-branch", () => createBranchModal?.show("dependent")),
 	);
 </script>
-
-{#if projectId}
-	<IntegrateUpstreamModal bind:this={modal} {projectId} />
-{/if}
 
 <div
 	class="chrome-header"
@@ -171,25 +140,10 @@
 >
 	<div class="chrome-left" data-tauri-drag-region={useCustomTitleBar}>
 		<div class="chrome-left-buttons" class:has-traffic-lights={useCustomTitleBar}>
-			<SyncButton {projectId} disabled={actionsDisabled} />
-
-			{#if isHasUpstreamCommits}
-				<Tooltip text={isDetached ? "HEAD is detached" : undefined} disabled={!isDetached}>
-					<Button
-						testId={TestId.IntegrateUpstreamCommitsButton}
-						style="pop"
-						onclick={openModal}
-						disabled={!projectId || actionsDisabled || isDetached}
-					>
-						{upstreamCommits} upstream {upstreamCommits === 1 ? "commit" : "commits"}
-					</Button>
-				</Tooltip>
-			{:else}
-				<div class="chrome-you-are-up-to-date">
-					<Icon name="tick" />
-					<span class="text-12">You’re up to date</span>
-				</div>
-			{/if}
+			<div class="chrome-you-are-up-to-date">
+				<Icon name="tick" />
+				<span class="text-12">本机离线模式</span>
+			</div>
 		</div>
 	</div>
 
@@ -263,32 +217,24 @@
 								}
 							}}
 						>
-							Add local repository
+							添加本机仓库
 						</SelectItem>
 					{/if}
-					<SelectItem
-						icon="clone"
-						onClick={() => {
-							goto("/onboarding/clone");
-						}}
-					>
-						Clone repository
-					</SelectItem>
 				</OptionsGroup>
 
 				<div class="text-11 new-window-hint">
 					<Icon name="open-in-folder" color="var(--text-3)" size={14} />
-					<span>Hold {newWindowModifierLabel} to open in a new window</span>
+					<span>按住 {newWindowModifierLabel} 在新窗口打开</span>
 				</div>
 			</Select>
 			{#if singleBranchMode}
-				<Tooltip text="Current branch">
+				<Tooltip text="当前分支">
 					<div class="chrome-current-branch" data-testid={TestId.ChromeHeaderCurrentBranch}>
 						<div class="chrome-current-branch__content">
 							<Icon name="branch" color="var(--text-2)" />
 							<span class="text-12 text-bold clr-text-2 truncate">{currentBranchName}</span>
 							{#if isNotInWorkspace}
-								<span class="text-12 text-bold clr-text-2 op-60"> read-only </span>
+								<span class="text-12 text-bold clr-text-2 op-60"> 只读 </span>
 							{/if}
 						</div>
 					</div>
@@ -296,21 +242,6 @@
 			{/if}
 		</div>
 
-		{#if currentMode && isNotInWorkspace}
-			<Tooltip text="Switch back to gitbutler/workspace">
-				<Button
-					kind="outline"
-					testId={TestId.ChromeHeaderSwitchBackToWorkspaceButton}
-					icon="undo"
-					style="warning"
-					onclick={switchToWorkspace}
-					reversedDirection
-					disabled={workspaceSwitch.current.isLoading}
-				>
-					Back to workspace
-				</Button>
-			</Tooltip>
-		{/if}
 	</div>
 
 	<div class="chrome-right" data-tauri-drag-region={useCustomTitleBar}>
@@ -323,7 +254,7 @@
 				reversedDirection
 				onclick={() => createBranchModal?.show()}
 			>
-				Create branch
+				创建分支
 			</Button>
 		{/if}
 	</div>

@@ -48,6 +48,9 @@ export class HttpClient {
 		if (!browser) {
 			throw new Error("Can't call fetch in SSR phase");
 		}
+		if (!import.meta.env.VITEST && import.meta.env.VITE_REPOSCOPE_OFFLINE !== "false") {
+			throw new Error("RepoScope Desktop 离线模式不允许 HTTP 请求");
+		}
 
 		const butlerHeaders = new Headers(DEFAULT_HEADERS);
 

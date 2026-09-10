@@ -10,22 +10,17 @@ interface SettingsPage {
 export const projectSettingsPages = [
 	{
 		id: "project",
-		label: "Project",
+		label: "项目",
 		icon: "user",
 	},
 	{
 		id: "git",
-		label: "Git stuff",
+		label: "Git 设置",
 		icon: "git",
 	},
 	{
-		id: "ai",
-		label: "AI options",
-		icon: "ai",
-	},
-	{
 		id: "experimental",
-		label: "Experimental",
+		label: "实验功能",
 		icon: "lab",
 	},
 ] as const satisfies readonly SettingsPage[];

@@ -45,6 +45,7 @@ export-schema = [
     "but-workspace/export-schema",
     "but-hunk-assignment/export-schema",
     "but-comments/export-schema",
+    "but-reposcope/export-schema",
     "gitbutler-project/export-schema",
     "but-rebase/export-schema",
     "gitbutler-operating-modes/export-schema",
@@ -80,6 +81,8 @@ legacy = [
     "dep:but-action",
     "dep:but-gerrit",
 ]
+## Do not execute repository-provided hooks in the offline desktop build.
+offline = []
 
 [dependencies]
 but-serde.workspace = true
@@ -98,6 +101,8 @@ but-db.workspace = true
 but-forge.workspace = true
 but-forge-storage.workspace = true
 but-comments.workspace = true
+but-reposcope.workspace = true
+bstr.workspace = true
 but-project-handle.workspace = true
 but-hunk-assignment.workspace = true
 but-hunk-dependency.workspace = true
@@ -135,16 +140,17 @@ napi = { version = "3.8.5", features = [
 ], optional = true }
 napi-derive = { version = "3.5.4", optional = true }
 boolean-enums.workspace = true
-bstr = { workspace = true }
 schemars.workspace = true
 serde.workspace = true
 futures.workspace = true
 tokio = { workspace = true, features = ["full"] }
 anyhow.workspace = true
 chrono.workspace = true
+regex.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
 uuid.workspace = true
+parking_lot.workspace = true
 serde-error = "0.1.3"
 gix = { workspace = true, features = ["worktree-mutation"] }
 open.workspace = true

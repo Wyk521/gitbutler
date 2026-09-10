@@ -1,6 +1,12 @@
 import { isMessageRole, type Prompt } from "$lib/ai/types";
 import { isStr } from "@gitbutler/ui/utils/string";
-import type { MessageParam } from "@anthropic-ai/sdk/resources/messages.mjs";
+
+/** Minimal local shape used by the legacy prompt adapter.  The offline
+ * product deliberately does not bundle an Anthropic SDK. */
+type MessageParam = {
+	role: "user" | "assistant";
+	content: string;
+};
 
 export function splitPromptMessages(prompt: Prompt): [MessageParam[], string | undefined] {
 	const messages: MessageParam[] = [];

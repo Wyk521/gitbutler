@@ -7,7 +7,7 @@
 	import { MODE_SERVICE } from "$lib/mode/modeService";
 	import { WORKTREE_SERVICE } from "$lib/worktree/worktreeService.svelte";
 	import { inject } from "@gitbutler/core/context";
-	import { AsyncButton, RadioButton, FileListItem, Link, TestId } from "@gitbutler/ui";
+	import { AsyncButton, RadioButton, FileListItem, TestId } from "@gitbutler/ui";
 	import type { BaseBranch } from "@gitbutler/but-sdk";
 	import type { Snippet } from "svelte";
 
@@ -48,12 +48,12 @@
 
 	let handlingOptions: { label: string; value: OptionsType; selectable: boolean }[] = $derived([
 		{
-			label: "Stash",
+			label: "暂存变更",
 			value: "stash",
 			selectable: true,
 		},
 		{
-			label: "Bring to Workspace",
+			label: "带回工作区",
 			value: "bring-to-workspace",
 			selectable: !conflicts, // TODO: Reactivity??
 		},
@@ -78,22 +78,19 @@
 
 			<div class="switchrepo__content" data-testid={TestId.NotOnGitButlerBranchView}>
 				<p class="switchrepo__title text-18 text-body text-bold">
-					You've switched away from <span class="code-string"> gitbutler/workspace </span>
+					你已切换离开 <span class="code-string">gitbutler/workspace</span>
 				</p>
 
 				<p class="switchrepo__message text-13 text-body">
-					Due to GitButler managing multiple virtual branches, you cannot switch back and forth
-					between git branches and virtual branches easily.
-					<Link href="https://docs.gitbutler.com/features/branch-management/integration-branch">
-						Learn more
-					</Link>
+					由于 GitButler 需要管理多个并行分支，普通 Git 分支和工作区之间不能直接频繁切换。
+					请使用下面的按钮返回工作区；RepoScope 分析不会改写分支引用。
 				</p>
 
 				{#if uncommittedChanges.length > 0}
 					<div class="switchrepo__uncommited-changes">
 						<div class="switchrepo__uncommited-changes__section">
 							<p class="switchrepo__label text-13 text-body text-bold">
-								You have uncommitted changes:
+								存在未提交变更：
 							</p>
 							<div class="switchrepo__file-list">
 								{#each uncommittedChanges as change, i}
@@ -106,7 +103,7 @@
 							</div>
 							{#if conflicts}
 								<p class="switchrepo__label text-13 text-body clr-text-2">
-									Some files can’t be applied due to conflicts:
+									以下文件因冲突暂时无法带回：
 								</p>
 								<div class="switchrepo__file-list">
 									<ReduxResult result={mode.result} {projectId}>
@@ -117,7 +114,7 @@
 														filePath={path}
 														clickable={false}
 														conflicted
-														conflictHint="Resolve to apply"
+										conflictHint="解决冲突后带回"
 														isLast={i === (mode.subject.worktreeConflicts?.length ?? 0) - 1}
 													/>
 												{/each}
@@ -131,7 +128,7 @@
 						<hr class="switchrepo__divider" />
 
 						<p class="switchrepo__label text-13 text-body text-bold">
-							What should we do with your uncommitted changes?
+							如何处理这些未提交变更？
 						</p>
 
 						<div class="switchrepo__handling-options">
@@ -161,7 +158,7 @@
 						loading={targetBranchSwitch.current.isLoading}
 						action={initSwithToWorkspace}
 					>
-						Switch back
+						返回工作区
 					</AsyncButton>
 				</div>
 			</div>

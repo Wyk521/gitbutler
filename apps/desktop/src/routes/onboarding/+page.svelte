@@ -1,20 +1,12 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import AnalyticsConfirmation from "$components/onboarding/AnalyticsConfirmation.svelte";
 	import Welcome from "$components/onboarding/Welcome.svelte";
 	import IllustrationSplitLayout from "$components/shared/IllustrationSplitLayout.svelte";
 	import newProjectSvg from "$lib/assets/illustrations/new-project.svg?raw";
-	import newZenSvg from "$lib/assets/illustrations/new-zen.svg?raw";
 	import { PROJECTS_SERVICE } from "$lib/project/projectsService";
-	import { SETTINGS_SERVICE } from "$lib/settings/appSettings";
 	import { sleep } from "$lib/utils/sleep";
 	import { inject } from "@gitbutler/core/context";
 	import { TestId } from "@gitbutler/ui";
-
-	const settingsService = inject(SETTINGS_SERVICE);
-	const appSettings = $derived(settingsService.appSettings);
-
-	const analyticsConfirmed = $derived($appSettings?.onboardingComplete);
 
 	const projectsService = inject(PROJECTS_SERVICE);
 	const projectsQuery = $derived(projectsService.projects());
@@ -32,18 +24,6 @@
 	});
 </script>
 
-{#if analyticsConfirmed === undefined}
-	<!-- Loading state while we determine if analytics have been confirmed -->
-	loading...
-{:else}
-	<IllustrationSplitLayout
-		img={analyticsConfirmed ? newZenSvg : newProjectSvg}
-		testId={TestId.OnboardingPage}
-	>
-		{#if analyticsConfirmed}
-			<Welcome />
-		{:else}
-			<AnalyticsConfirmation />
-		{/if}
-	</IllustrationSplitLayout>
-{/if}
+<IllustrationSplitLayout img={newProjectSvg} testId={TestId.OnboardingPage}>
+	<Welcome />
+</IllustrationSplitLayout>

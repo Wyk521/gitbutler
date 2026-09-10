@@ -1,5 +1,4 @@
 <script lang="ts">
-	import CloudForm from "$components/projectSettings/CloudForm.svelte";
 	import GeneralSettings from "$components/projectSettings/GeneralSettings.svelte";
 	import GitForm from "$components/projectSettings/GitForm.svelte";
 	import PreferencesForm from "$components/projectSettings/PreferencesForm.svelte";
@@ -22,8 +21,8 @@
 	}
 </script>
 
-<SettingsModalLayout
-	title="Project settings"
+	<SettingsModalLayout
+	title="项目设置"
 	{pages}
 	selectedId={currentSelectedId}
 	onSelectPage={selectPage}
@@ -34,15 +33,13 @@
 				<GeneralSettings projectId={data.projectId} />
 			{:else if currentPage.id === "git"}
 				<GitForm projectId={data.projectId} />
-			{:else if currentPage.id === "ai"}
-				<CloudForm projectId={data.projectId} />
 			{:else if currentPage.id === "experimental"}
 				<PreferencesForm projectId={data.projectId} />
 			{:else}
-				Settings page {currentPage.id} not Found.
+				未找到设置页面：{currentPage.id}
 			{/if}
 		{:else}
-			Settings page {currentSelectedId} not Found.
+			未找到设置页面：{currentSelectedId}
 		{/if}
 	{/snippet}
 </SettingsModalLayout>

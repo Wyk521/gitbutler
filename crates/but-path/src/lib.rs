@@ -6,9 +6,9 @@
 //! these helpers stop using the platform-specific GitButler locations
 //! and instead use fixed subdirectories underneath that directory:
 //!
-//! - app data: `<E2E_TEST_APP_DATA_DIR>/com.gitbutler.app`
+//! - app data: `<E2E_TEST_APP_DATA_DIR>/RepoScope Desktop`
 //! - logs: `<E2E_TEST_APP_DATA_DIR>/logs`
-//! - config: `<E2E_TEST_APP_DATA_DIR>/gitbutler`
+//! - config: `<E2E_TEST_APP_DATA_DIR>/RepoScope Desktop`
 //! - cache: `<E2E_TEST_APP_DATA_DIR>/cache`
 //! - home: `<E2E_TEST_APP_DATA_DIR>/home`
 //!
@@ -26,7 +26,7 @@ use anyhow::Context;
 /// > ⚠️Keep in sync with `tauri::AppHandle::path().app_data_dir().`
 ///
 /// When `E2E_TEST_APP_DATA_DIR` is set, returns
-/// `<E2E_TEST_APP_DATA_DIR>/com.gitbutler.app` for every channel.
+/// `<E2E_TEST_APP_DATA_DIR>/RepoScope Desktop` for every channel.
 pub fn app_data_dir() -> anyhow::Result<PathBuf> {
     app_data_dir_for_channel(AppChannel::new())
 }
@@ -46,14 +46,14 @@ pub fn home_dir() -> Option<PathBuf> {
 /// Like [`app_data_dir()`], but explicitly for `channel`.
 ///
 /// When `E2E_TEST_APP_DATA_DIR` is set, `channel` is ignored and the result is always
-/// `<E2E_TEST_APP_DATA_DIR>/com.gitbutler.app`.
+/// `<E2E_TEST_APP_DATA_DIR>/RepoScope Desktop`.
 pub fn app_data_dir_for_channel(channel: AppChannel) -> anyhow::Result<PathBuf> {
     if let Some(test_dir) = std::env::var_os("E2E_TEST_APP_DATA_DIR") {
-        return Ok(PathBuf::from(test_dir).join("com.gitbutler.app"));
+        return Ok(PathBuf::from(test_dir).join("RepoScope Desktop"));
     }
     dirs::data_dir()
         .ok_or(anyhow::anyhow!("Could not get app data dir"))
-        .map(|dir| dir.join(identifier_for_channel(channel)))
+        .map(|dir| dir.join(directory_name_for_channel(channel)))
 }
 
 /// The directory to store logs in, **one per channel**.
@@ -71,7 +71,26 @@ pub fn app_data_dir_for_channel(channel: AppChannel) -> anyhow::Result<PathBuf> 
 /// this function returns `<E2E_TEST_APP_DATA_DIR>/logs` instead of the platform-specific
 /// default directories above. This override always ignores the compile-time channel.
 pub fn app_log_dir() -> anyhow::Result<PathBuf> {
-    app_log_dir_for_identifier(identifier())
+    app_log_dir_for_channel(AppChannel::new())
+}
+
+/// Returns the log directory for an application channel.
+pub fn app_log_dir_for_channel(channel: AppChannel) -> anyhow::Result<PathBuf> {
+    if let Some(test_dir) = std::env::var_os("E2E_TEST_APP_DATA_DIR") {
+        return Ok(PathBuf::from(test_dir).join("logs"));
+    }
+    if cfg!(target_os = "macos") {
+        dirs::home_dir()
+            .with_context(|| "Couldn't resolve home directory")
+            .map(|dir| {
+                dir.join("Library/Logs")
+                    .join(directory_name_for_channel(channel))
+            })
+    } else {
+        dirs::data_local_dir()
+            .with_context(|| "Couldn't resolve local data directory")
+            .map(|dir| dir.join(directory_name_for_channel(channel)).join("logs"))
+    }
 }
 
 /// Like [`app_log_dir()`], but for an explicit bundle `identifier`, for applications
@@ -98,17 +117,17 @@ pub fn app_log_dir_for_identifier(identifier: &str) -> anyhow::Result<PathBuf> {
 ///
 /// > ⚠️Keep in sync with `tauri::AppHandle::path().app_config_dir().`
 ///
-/// When `E2E_TEST_APP_DATA_DIR` is set, returns `<E2E_TEST_APP_DATA_DIR>/gitbutler`.
+/// When `E2E_TEST_APP_DATA_DIR` is set, returns `<E2E_TEST_APP_DATA_DIR>/RepoScope Desktop`.
 pub fn app_config_dir() -> anyhow::Result<PathBuf> {
     if let Some(test_dir) = std::env::var_os("E2E_TEST_APP_DATA_DIR") {
-        return Ok(PathBuf::from(test_dir).join("gitbutler"));
+        return Ok(PathBuf::from(test_dir).join("RepoScope Desktop"));
     }
     dirs::config_dir()
         .ok_or(anyhow::anyhow!("Could not get app data dir"))
-        .map(|dir| dir.join("gitbutler"))
+        .map(|dir| dir.join("RepoScope Desktop"))
 }
 
-/// Returns the platform-specific cache directory for GitButler, **one per channel**.
+/// Returns the platform-specific cache directory for RepoScope Desktop, **one per channel**.
 ///
 /// > ⚠️Keep in sync with `tauri::AppHandle::path().app_cache_dir().`
 ///
@@ -122,9 +141,9 @@ pub fn app_config_dir() -> anyhow::Result<PathBuf> {
 ///
 /// # Platform-specific locations
 ///
-/// - **macOS**: `~/Library/Caches/com.gitbutler.app{channel}/`
-/// - **Linux**: `~/.cache/com.gitbutler.app{channel}/` (following XDG Base Directory Specification)
-/// - **Windows**: `%LOCALAPPDATA%\com.gitbutler.app{channel}\`
+/// - **macOS**: `~/Library/Caches/RepoScope Desktop{channel}/`
+/// - **Linux**: `~/.cache/RepoScope Desktop{channel}/` (following XDG Base Directory Specification)
+/// - **Windows**: `%LOCALAPPDATA%\RepoScope Desktop{channel}\`
 ///
 /// # Testing
 ///
@@ -149,7 +168,7 @@ pub fn app_cache_dir_for_channel(channel: AppChannel) -> anyhow::Result<PathBuf>
     }
     dirs::cache_dir()
         .ok_or(anyhow::anyhow!("Could not get app cache dir"))
-        .map(|dir| dir.join(identifier_for_channel(channel)))
+        .map(|dir| dir.join(directory_name_for_channel(channel)))
 }
 
 /// Returns the bundle identifier for the compile-time [`AppChannel`].
@@ -160,9 +179,18 @@ pub fn identifier() -> &'static str {
 /// Returns the bundle identifier used for `channel`.
 pub const fn identifier_for_channel(channel: AppChannel) -> &'static str {
     match channel {
-        AppChannel::Nightly => "com.gitbutler.app.nightly",
-        AppChannel::Release => "com.gitbutler.app",
-        AppChannel::Dev => "com.gitbutler.app.dev",
+        AppChannel::Nightly => "com.reposcope.desktop.nightly",
+        AppChannel::Release => "com.reposcope.desktop",
+        AppChannel::Dev => "com.reposcope.desktop.dev",
+    }
+}
+
+/// Returns the human-readable per-channel directory name used for local data.
+pub const fn directory_name_for_channel(channel: AppChannel) -> &'static str {
+    match channel {
+        AppChannel::Nightly => "RepoScope Desktop Nightly",
+        AppChannel::Release => "RepoScope Desktop",
+        AppChannel::Dev => "RepoScope Desktop Dev",
     }
 }
 
@@ -205,8 +233,8 @@ impl AppChannel {
                 identifier_for_channel(AppChannel::Dev)
             }
         }) {
-            "com.gitbutler.app.nightly" => AppChannel::Nightly,
-            "com.gitbutler.app" => AppChannel::Release,
+            "com.reposcope.desktop.nightly" => AppChannel::Nightly,
+            "com.reposcope.desktop" => AppChannel::Release,
             _ => AppChannel::Dev,
         }
     }

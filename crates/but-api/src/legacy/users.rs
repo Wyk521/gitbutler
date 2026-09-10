@@ -208,6 +208,15 @@ pub fn login_and_persist(token: String) -> Result<UserProfile> {
 #[but_api(try_from = json::UserWithSecretsSensitive)]
 #[instrument(err(Debug))]
 pub fn get_user() -> Result<Option<User>> {
+    #[cfg(feature = "offline")]
+    {
+        // RepoScope Desktop has no account/profile surface.  Returning an
+        // empty local session keeps shared frontend dependency bootstrap
+        // deterministic without touching the keychain or any network API.
+        return Ok(None);
+    }
+
+    #[cfg(not(feature = "offline"))]
     match gitbutler_user::get_user()? {
         Some(user) => {
             if let Err(err) = user.access_token() {

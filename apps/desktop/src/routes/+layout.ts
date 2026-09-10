@@ -1,4 +1,3 @@
-import { initAnalyticsIfEnabled } from "$lib/analytics/analytics";
 import createBackend from "$lib/backend";
 import { SettingsService } from "$lib/settings/appSettings";
 import { EventContext } from "$lib/telemetry/eventContext";
@@ -15,8 +14,6 @@ export const csr = true;
 
 // eslint-disable-next-line
 export const load: LayoutLoad = async () => {
-	// Awaited and will block initial render, but it is necessary in order to respect the user
-	// settings on telemetry.
 	const backend = createBackend();
 
 	const homeDir = await backend.homeDirectory();
@@ -27,8 +24,6 @@ export const load: LayoutLoad = async () => {
 	const appSettings = await settingsService.fetchAppSettings();
 
 	const posthog = new PostHogWrapper(settingsService, backend, eventContext);
-	initAnalyticsIfEnabled(appSettings, posthog);
-
 	return {
 		homeDir,
 		backend,

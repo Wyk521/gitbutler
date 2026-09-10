@@ -31,6 +31,9 @@ export class ButlerAIClient implements AIClient {
 	) {}
 
 	async evaluate(prompt: Prompt, options?: AIEvalOptions): Promise<string> {
+		if (!import.meta.env.VITEST && import.meta.env.VITE_REPOSCOPE_OFFLINE !== "false") {
+			throw new Error("RepoScope Desktop 离线模式已禁用 AI 功能");
+		}
 		const [messages, system] = splitPromptMessagesIfNecessary(this.modelKind, prompt);
 		const response = await this.cloud.postRaw("ai/stream", {
 			body: {

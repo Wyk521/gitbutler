@@ -16,7 +16,7 @@ export const config = {
 	capabilities: [
 		{
 			"tauri:options": {
-				application: "../target/debug/gitbutler-tauri",
+				application: "../target/debug/reposcope-desktop",
 			},
 		},
 	],

@@ -318,6 +318,87 @@ pub fn open_url(url: String) -> Result<()> {
     open_that(&url)
 }
 
+/// Opens a local file or configured editor URI without enabling network URLs.
+///
+/// RepoScope Desktop keeps this narrow command so GitButler's local “在编辑器
+/// 中打开” and file hand-off affordances continue to work in an offline build.
+/// HTTP(S), mail, remote file hosts, credentials and all other schemes are
+/// rejected before the platform opener is called.
+#[but_api]
+#[instrument(err(Debug))]
+pub fn open_local_target(url: String) -> Result<()> {
+    let parsed = Url::parse(&url).context("Invalid local path format")?;
+    if !is_local_target_url(&parsed) || has_sensitive_query(&parsed) {
+        bail!("离线模式只允许打开本机文件或本地编辑器 URI");
+    }
+    open_that(&parsed)
+}
+
+fn is_local_target_url(url: &Url) -> bool {
+    if url.username() != "" || url.password().is_some() || url.fragment().is_some() {
+        return false;
+    }
+    match url.scheme() {
+        "file" => url
+            .host_str()
+            .is_none_or(|host| host.is_empty() || host.eq_ignore_ascii_case("localhost")),
+        "vscode" | "vscode-insiders" | "vscodium" | "zed" | "windsurf" | "cursor"
+        | "trae" | "antigravity-ide" => url
+            .host_str()
+            .is_none_or(|host| host.eq_ignore_ascii_case("file")),
+        _ => false,
+    }
+}
+
+fn has_sensitive_query(url: &Url) -> bool {
+    url.query_pairs().any(|(key, _)| {
+        let key = key.to_ascii_lowercase();
+        [
+            "token",
+            "secret",
+            "password",
+            "passwd",
+            "pwd",
+            "credential",
+            "authorization",
+            "api_key",
+            "apikey",
+            "access_key",
+            "access_token",
+            "private_key",
+            "username",
+            "user",
+        ]
+        .iter()
+        .any(|needle| key == *needle || key.contains(needle))
+    })
+}
+
+#[cfg(test)]
+mod local_target_tests {
+    use super::*;
+
+    #[test]
+    fn local_target_filter_rejects_network_and_credentials() {
+        assert!(is_local_target_url(&Url::parse("file:///C:/repo/src/main.rs").unwrap()));
+        assert!(is_local_target_url(
+            &Url::parse("vscode://file/C:/repo/src/main.rs:12").unwrap()
+        ));
+        assert!(!is_local_target_url(
+            &Url::parse("https://example.com/repo").unwrap()
+        ));
+        assert!(!is_local_target_url(
+            &Url::parse("file://server/share/repo").unwrap()
+        ));
+        assert!(!is_local_target_url(
+            &Url::parse("vscode://file/C:/repo?token=secret#fragment").unwrap()
+        ));
+        assert!(has_sensitive_query(
+            &Url::parse("vscode://file/C:/repo?access_token=secret").unwrap()
+        ));
+    }
+}
+
 fn add_did_param(url: &mut Url) {
     let own_site = url.host_str().is_some_and(|host| {
         ["gitbutler.com", "but.dev"]

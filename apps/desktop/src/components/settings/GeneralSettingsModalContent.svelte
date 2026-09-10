@@ -1,19 +1,12 @@
 <script lang="ts">
 	import AppearanceSettings from "$components/projectSettings/AppearanceSettings.svelte";
-	import AiSettings from "$components/settings/AiSettings.svelte";
 	import ExperimentalSettings from "$components/settings/ExperimentalSettings.svelte";
-	import GeneralSettings from "$components/settings/GeneralSettings.svelte";
+	import OfflineGeneralSettings from "$components/settings/OfflineGeneralSettings.svelte";
 	import GitSettings from "$components/settings/GitSettings.svelte";
-	import IntegrationsSettings from "$components/settings/IntegrationsSettings.svelte";
 	import LanesAndBranchesSettings from "$components/settings/LanesAndBranchesSettings.svelte";
-	import OrganisationSettings from "$components/settings/OrganisationSettings.svelte";
+	import OfflineCapabilityNotice from "$components/settings/OfflineCapabilityNotice.svelte";
 	import SettingsModalLayout from "$components/settings/SettingsModalLayout.svelte";
-	import TelemetrySettings from "$components/settings/TelemetrySettings.svelte";
-	import { URL_SERVICE } from "$lib/backend/url";
 	import { generalSettingsPages } from "$lib/settings/generalSettingsPages";
-	import { USER_SERVICE } from "$lib/user/userService.svelte";
-	import { inject } from "@gitbutler/core/context";
-	import { Icon } from "@gitbutler/ui";
 	import type { GeneralSettingsModalState, GeneralSettingsPageId } from "$lib/state/uiState.svelte";
 
 	type Props = {
@@ -22,9 +15,6 @@
 
 	const { data }: Props = $props();
 
-	const userService = inject(USER_SERVICE);
-	const urlService = inject(URL_SERVICE);
-
 	let currentSelectedId = $derived(data.selectedId || generalSettingsPages[0]!.id);
 
 	function selectPage(pageId: GeneralSettingsPageId) {
@@ -32,17 +22,16 @@
 	}
 </script>
 
-<SettingsModalLayout
-	title="Global settings"
+	<SettingsModalLayout
+	title="全局设置"
 	pages={generalSettingsPages}
 	selectedId={currentSelectedId}
-	isAdmin={userService.user?.role === "admin"}
 	onSelectPage={selectPage}
 >
 	{#snippet content({ currentPage })}
 		{#if currentPage}
 			{#if currentPage.id === "general"}
-				<GeneralSettings />
+				<OfflineGeneralSettings />
 			{:else if currentPage.id === "appearance"}
 				<AppearanceSettings />
 			{:else if currentPage.id === "lanes-and-branches"}
@@ -50,73 +39,19 @@
 			{:else if currentPage.id === "git"}
 				<GitSettings />
 			{:else if currentPage.id === "integrations"}
-				<IntegrationsSettings />
+				<OfflineCapabilityNotice title="在线集成已关闭" detail="此版本不登录、不访问 GitHub、GitLab、Bitbucket 或其他远程服务。" />
 			{:else if currentPage.id === "ai"}
-				<AiSettings />
+				<OfflineCapabilityNotice title="联网 AI 已关闭" detail="RepoScope Desktop 不会把代码、差异或凭据发送到外部 AI 服务。" />
 			{:else if currentPage.id === "telemetry"}
-				<TelemetrySettings />
+				<OfflineCapabilityNotice title="遥测已关闭" detail="本版本不收集、上传分析数据或崩溃报告。" />
 			{:else if currentPage.id === "experimental"}
 				<ExperimentalSettings />
-			{:else if currentPage.id === "organizations"}
-				<OrganisationSettings />
 			{:else}
-				Settings page {currentPage.id} not Found.
+				未找到设置页面：{currentPage.id}
 			{/if}
 		{:else}
-			Settings page {currentSelectedId} not Found.
+		未找到设置页面：{currentSelectedId}
 		{/if}
 	{/snippet}
 
-	{#snippet footer()}
-		<div class="social">
-			<button
-				type="button"
-				class="social-btn"
-				onclick={async () => await urlService.openExternalUrl("https://docs.gitbutler.com/")}
-			>
-				<Icon name="docs" />
-				<span class="text-13 text-bold">Docs</span>
-				<div class="text-13 open-link-icon">↗</div>
-			</button>
-			<button
-				type="button"
-				class="social-btn"
-				onclick={async () => await urlService.openExternalUrl("https://discord.gg/MmFkmaJ42D")}
-			>
-				<Icon name="discord" />
-				<span class="text-13 text-bold">Our Discord</span>
-				<div class="text-13 open-link-icon">↗</div>
-			</button>
-		</div>
-	{/snippet}
 </SettingsModalLayout>
-
-<style lang="postcss">
-	/* BANNERS */
-	.social {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-
-	.social-btn {
-		display: flex;
-		align-items: center;
-		padding: 8px 12px;
-		gap: 12px;
-		border-radius: var(--radius-m);
-		background-color: var(--bg-1);
-		color: var(--text-2);
-		text-align: left;
-		transition: all var(--transition-fast);
-
-		&:hover {
-			background-color: var(--hover-bg-1);
-		}
-	}
-
-	.open-link-icon {
-		transform: translateY(-2px) translateX(-4px);
-		color: var(--text-3);
-	}
-</style>

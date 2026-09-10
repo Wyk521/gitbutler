@@ -1,8 +1,8 @@
 {
-	"productName": "GitButler Nightly",
-	"identifier": "com.gitbutler.app.nightly",
+	"productName": "RepoScope Desktop Nightly",
+	"identifier": "com.reposcope.desktop.nightly",
 	"build": {
-		"beforeBuildCommand": "bash ./crates/gitbutler-tauri/tauri-before-build-command.sh nightly"
+		"beforeBuildCommand": "pnpm build:desktop -- --mode production"
 	},
 	"bundle": {
 		"active": true,
@@ -12,19 +12,17 @@
 			"icons/nightly/128x128@2x.png",
 			"icons/nightly/icon.icns",
 			"icons/nightly/icon.ico"
-		],
-		"externalBin": ["gitbutler-git-askpass"]
+		]
 	},
-	"plugins": {
-		"updater": {
-			"endpoints": [
-				"https://app.gitbutler.com/releases/nightly/{{target}}-{{arch}}/{{current_version}}"
-			],
-			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYwNTc2RDhBM0U0MjM4RUIKUldUck9FSStpbTFYWUE5UkJ3eXhuekZOL2V2RnpKaFUxbGJRNzBMVmF5V0gzV1JvN3hRblJMRDIK"
-		},
-		"deep-link": {
-			"desktop": {
-				"schemes": ["but-nightly"]
+	"plugins": {},
+	"app": {
+		"security": {
+			"csp": {
+				"default-src": "'self'",
+				"img-src": "'self' asset: tauri://localhost data: blob:",
+				"connect-src": "'self' ipc: data:",
+				"script-src": "'self' 'wasm-unsafe-eval'",
+				"style-src": "'self' 'unsafe-inline'"
 			}
 		}
 	}

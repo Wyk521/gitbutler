@@ -15,10 +15,10 @@
 		<SettingsSection gap={8}>
 			<CardGroup.Item standalone labelFor="omitCertificateCheck">
 				{#snippet title()}
-					Ignore host certificate checks
+					忽略主机证书检查
 				{/snippet}
 				{#snippet caption()}
-					Enabling this will ignore host certificate checks when authenticating with ssh.
+					启用后，使用 SSH 时忽略主机证书检查。
 				{/snippet}
 				{#snippet actions()}
 					<Toggle

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.reposcope.desktop</id>
+  <metadata_license>FSFAP</metadata_license>
+  <project_license>LicenseRef-FSL-1.1-MIT</project_license>
+  <name>RepoScope Desktop</name>
+  <summary>基于 GitButler 的本机离线仓库洞察工具</summary>
+  <developer id="com.reposcope"><name>RepoScope Desktop</name></developer>
+  <description>
+    <p>RepoScope Desktop 在本机分析 Git 历史、工作区和审计线索，不访问网络。</p>
+    <p>本程序基于 GitButler；完整来源、版权和 FSL-1.1-MIT 许可见应用关于页。</p>
+  </description>
+</component>

@@ -1,6 +1,10 @@
-import { IpcError, applyIpcFingerprint } from "$lib/error/normalizedError";
+import {
+	IpcError,
+	applyIpcFingerprint,
+	type ErrorEvent,
+	type EventHint,
+} from "$lib/error/normalizedError";
 import { describe, expect, test } from "vitest";
-import type { ErrorEvent, EventHint } from "@sentry/sveltekit";
 
 /**
  * Pins the `beforeSend` wiring: given an `IpcError` exception hint, the

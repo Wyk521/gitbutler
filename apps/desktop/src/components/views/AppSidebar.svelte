@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import ProfileButton from "$components/shared/ProfileButton.svelte";
-	import ShareIssueModal from "$components/shared/ShareIssueModal.svelte";
 	import {
 		branchesPath,
 		isBranchesPath,
+		isInsightsPath,
 		isWorkspacePath,
 		historyPath,
 		isHistoryPath,
+		insightsPath,
 		workspacePath,
 	} from "$lib/routes/routes.svelte";
 	import { useSettingsModal } from "$lib/settings/settingsModal.svelte";
@@ -22,7 +22,6 @@
 
 	let contextTriggerButton = $state<HTMLButtonElement | undefined>();
 	let contextMenuOpen = $state(false);
-	let shareIssueModal = $state<ShareIssueModal>();
 
 	const uiState = inject(UI_STATE);
 	const { openGeneralSettings, openProjectSettings } = useSettingsModal();
@@ -41,7 +40,7 @@
 				width={34}
 				hotkey="⌘1"
 				class={["btn-square", isWorkspacePath() && "btn-active"]}
-				tooltip="Workspace"
+				tooltip="工作区"
 				{disabled}
 			>
 				{#snippet custom()}
@@ -79,7 +78,7 @@
 				width={34}
 				class={["btn-square", isBranchesPath() && "btn-active"]}
 				hotkey="⌘2"
-				tooltip="Branches"
+				tooltip="分支"
 				{disabled}
 			>
 				{#snippet custom()}
@@ -144,7 +143,7 @@
 				width={34}
 				class={["btn-square", isHistoryPath() && "btn-active"]}
 				hotkey="⌘3"
-				tooltip="Operations history"
+				tooltip="操作历史"
 				{disabled}
 			>
 				{#snippet custom()}
@@ -176,6 +175,27 @@
 				{/snippet}
 			</Button>
 		</div>
+		<div>
+			{#if isInsightsPath()}
+				<div class="active-page-indicator" in:slide={{ axis: "x", duration: 150 }}></div>
+			{/if}
+			<Button
+				kind="outline"
+				onclick={() => goto(insightsPath(projectId))}
+				width={34}
+				class={["btn-square", isInsightsPath() && "btn-active"]}
+				hotkey="⌘4"
+				tooltip="仓库洞察"
+				{disabled}
+			>
+				{#snippet custom()}
+					<svg width="17" height="16" viewBox="0 0 17 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+						<path d="M2 14V8.5M7.5 14V2M13 14V5" stroke="var(--clr-history-outline)" stroke-width="1.5" stroke-linecap="round" />
+						<path d="M1 14.25H15.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+					</svg>
+				{/snippet}
+			</Button>
+		</div>
 	</div>
 	<div class="bottom">
 		<div class="bottom__primary-actions">
@@ -190,7 +210,7 @@
 					class="btn-square"
 					tooltipPosition="top"
 					tooltipAlign="start"
-					tooltip="Project settings"
+					tooltip="项目设置"
 				>
 					{#snippet custom()}
 						<svg
@@ -214,21 +234,6 @@
 				</Button>
 			</div>
 
-			<ProfileButton />
-		</div>
-		<div class="bottom__ghost-actions">
-			<Button
-				icon="mail"
-				kind="ghost"
-				tooltip="Share feedback"
-				tooltipPosition="top"
-				tooltipAlign="start"
-				width={34}
-				class="faded-btn"
-				onclick={() => {
-					shareIssueModal?.show();
-				}}
-			/>
 		</div>
 	</div>
 </div>
@@ -243,33 +248,33 @@
 			contextMenuOpen = false;
 		}}
 	>
-		<ContextMenuSection>
-			<ContextMenuItem
-				label="Global settings"
-				onclick={() => {
+			<ContextMenuSection>
+				<ContextMenuItem
+					label="全局设置"
+					onclick={() => {
 					openGeneralSettings();
 					contextMenuOpen = false;
 				}}
 				keyboardShortcut="⌘,"
 			/>
 		</ContextMenuSection>
-		<ContextMenuSection title="Theme (⌘T)">
+		<ContextMenuSection title="主题（⌘T）">
 			<ContextMenuItem
-				label="Dark"
+				label="深色"
 				onclick={async () => {
 					uiState.global.theme.set("dark");
 					contextMenuOpen = false;
 				}}
 			/>
 			<ContextMenuItem
-				label="Light"
+				label="浅色"
 				onclick={async () => {
 					uiState.global.theme.set("light");
 					contextMenuOpen = false;
 				}}
 			/>
 			<ContextMenuItem
-				label="System"
+				label="跟随系统"
 				onclick={async () => {
 					uiState.global.theme.set("system");
 					contextMenuOpen = false;
@@ -278,8 +283,6 @@
 		</ContextMenuSection>
 	</ContextMenu>
 {/if}
-
-<ShareIssueModal bind:this={shareIssueModal} />
 
 <style lang="postcss">
 	.sidebar {

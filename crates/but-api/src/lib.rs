@@ -8,6 +8,10 @@
 #![cfg_attr(not(feature = "napi"), forbid(unsafe_code))]
 #![cfg_attr(feature = "napi", deny(unsafe_code))]
 #![deny(missing_docs)]
+// Clippy 1.96 reports the `thread_local!` initializer in panic_capture even
+// though the macro already uses a `const { ... }` initializer.  Keep the
+// upstream compatibility shim while the minimum toolchain catches up.
+#![allow(clippy::missing_const_for_thread_local)]
 
 use std::collections::BTreeMap;
 
@@ -77,6 +81,9 @@ pub mod tags;
 
 /// App-level AI configuration.
 pub mod ai;
+
+/// Offline RepoScope analysis and repository-diagnostics APIs.
+pub mod reposcope;
 
 /// Functions for workspace state.
 pub mod workspace_state;

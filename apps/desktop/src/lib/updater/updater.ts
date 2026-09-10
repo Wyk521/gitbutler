@@ -59,6 +59,8 @@ export class UpdaterService {
 	private seenVersion: string | undefined;
 	private backendDownload: DownloadUpdate | undefined;
 	private backendInstall: InstallUpdate | undefined;
+	private readonly offline =
+		!import.meta.env.VITEST && import.meta.env.VITE_REPOSCOPE_OFFLINE !== "false";
 
 	unlistenStatus?: () => void;
 	unlistenMenu?: () => void;
@@ -71,6 +73,7 @@ export class UpdaterService {
 	) {}
 
 	private async start() {
+		if (this.offline) return;
 		// This shortcut registration is never unsubscribed, but that's likely
 		// fine for the time being since the `AppUpdater` can never unmount.
 		this.shortcuts.on("update", () => {
@@ -94,6 +97,7 @@ export class UpdaterService {
 	}
 
 	async checkForUpdate(manual = false) {
+		if (this.offline) return;
 		if (get(this.disableAutoChecks) && !manual) return;
 
 		if (manual) {

@@ -8,7 +8,6 @@
 	import { showError } from "$lib/error/showError";
 	import { PROJECTS_SERVICE } from "$lib/project/projectsService";
 	import { SETTINGS_SERVICE } from "$lib/settings/appSettings";
-	import { OnboardingEvent, POSTHOG_WRAPPER } from "$lib/telemetry/posthog";
 	import { inject } from "@gitbutler/core/context";
 	import { TestId } from "@gitbutler/ui";
 	import type { RemoteBranchInfo } from "$lib/baseBranch/baseBranch";
@@ -22,7 +21,6 @@
 
 	const projectsService = inject(PROJECTS_SERVICE);
 	const baseService = inject(BASE_BRANCH_SERVICE);
-	const posthog = inject(POSTHOG_WRAPPER);
 	const settingsStore = inject(SETTINGS_SERVICE).appSettings;
 	const projectQuery = $derived(projectsService.getProject(projectId));
 	const [setBaseBranchTarget] = baseService.setTarget;
@@ -46,12 +44,9 @@
 					pushRemote,
 				});
 			}
-		} catch (e: unknown) {
-			posthog.captureOnboarding(OnboardingEvent.SetTargetBranchFailed, e);
-			throw e;
+		} catch (error: unknown) {
+			throw error;
 		}
-
-		posthog.captureOnboarding(OnboardingEvent.SetTargetBranch);
 	}
 
 	async function openProject(): Promise<boolean> {
@@ -60,14 +55,14 @@
 			await goto(destination, { invalidateAll: true });
 			return true;
 		} catch (error) {
-			showError("The target was set, but the project could not be opened", error);
+			showError("目标分支已设置，但项目无法打开", error);
 			return false;
 		}
 	}
 
 	$effect(() => {
 		if (projectQuery.result.isError) {
-			console.error("Failed to load project, redirecting:", projectQuery.result.error);
+			console.error("读取项目失败，正在返回项目列表：", projectQuery.result.error);
 			goto("/");
 		}
 	});

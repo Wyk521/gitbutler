@@ -13,16 +13,18 @@ export default class URLService {
 		try {
 			await this.backend.openExternalUrl(href);
 		} catch (e) {
-			if (typeof e === "string" || e instanceof String) {
-				const message = `
-                Failed to open link in external browser:
+			// The URL may have originated in repository content and can contain
+			// credentials.  Never echo it into a toast or log while reporting the
+			// offline boundary failure.
+			void href;
+			showToast({
+				title: "外部链接已禁用",
+				message: "RepoScope Desktop 离线模式不会打开外部网址。",
+				style: "danger",
+			});
 
-                ${href}
-            `;
-				showToast({ title: "External URL error", message, style: "danger" });
-			}
-
-			// Rethrowing for sentry and posthog
+			// Keep the original error for the local caller; remote telemetry is
+			// disabled and therefore cannot receive the URL.
 			throw e;
 		}
 	}

@@ -1,29 +1,27 @@
 <script lang="ts">
 	import { fModeEnabled } from "$lib/config/uiFeatureFlags";
 	import { SETTINGS_SERVICE } from "$lib/settings/appSettings";
-	import { USER_SERVICE } from "$lib/user/userService.svelte";
-	import { inject } from "@gitbutler/core/context";
-	import { CardGroup, Toggle } from "@gitbutler/ui";
+import { inject } from "@gitbutler/core/context";
+import { CardGroup, Toggle } from "@gitbutler/ui";
 
 	const settingsService = inject(SETTINGS_SERVICE);
 	const settingsStore = settingsService.appSettings;
 
-	const userService = inject(USER_SERVICE);
 </script>
 
 <p class="text-12 text-body experimental-settings__text">
-	Flags for features in development or beta. Features may not work fully.
+	以下功能仍在开发或测试阶段，可能尚未完整稳定。
 	<br />
-	Use at your own risk.
+	请在确认影响后再启用。
 </p>
 
 <CardGroup>
 	<CardGroup.Item labelFor="f-mode">
 		{#snippet title()}
-			F Mode Navigation
+			F 键快速导航
 		{/snippet}
 		{#snippet caption()}
-			Enable F mode for quick keyboard navigation to buttons using two-letter shortcuts.
+			使用两字母快捷键快速定位界面按钮。
 		{/snippet}
 		{#snippet actions()}
 			<Toggle
@@ -34,33 +32,12 @@
 		{/snippet}
 	</CardGroup.Item>
 
-	{#if userService.user?.role === "admin"}
-		<CardGroup.Item labelFor="single-branch">
-			{#snippet title()}
-				Single-branch mode
-			{/snippet}
-			{#snippet caption()}
-				Stay in the workspace view when leaving the gitbutler/workspace branch.
-			{/snippet}
-			{#snippet actions()}
-				<Toggle
-					id="single-branch"
-					checked={$settingsStore?.featureFlags.singleBranch}
-					onclick={() =>
-						settingsService.updateFeatureFlags({
-							singleBranch: !$settingsStore?.featureFlags.singleBranch,
-						})}
-				/>
-			{/snippet}
-		</CardGroup.Item>
-	{/if}
-
 	<CardGroup.Item labelFor="worktree-manipulation">
 		{#snippet title()}
-			Worktree manipulation
+			链接 Worktree
 		{/snippet}
 		{#snippet caption()}
-			Enable experimental support for working with linked git worktrees.
+			启用链接 Git Worktree 的实验性支持。
 		{/snippet}
 		{#snippet actions()}
 			<Toggle

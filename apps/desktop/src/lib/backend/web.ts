@@ -1,4 +1,5 @@
 import { IpcError, isNormalizedError } from "$lib/error/normalizedError";
+import { redactSensitiveText } from "$lib/error/redact";
 import { getCookie } from "$lib/utils/cookies";
 import ReconnectingWebSocket from "reconnecting-websocket";
 import { readable } from "svelte/store";
@@ -96,13 +97,13 @@ async function webWriteTextToClipboard(text: string): Promise<void> {
 
 async function webGetAppInfo(): Promise<AppInfo> {
 	return await Promise.resolve({
-		name: "gitbutler-web",
+		name: "RepoScope Desktop Web",
 		version: "0.0.0",
 	});
 }
 
 async function webHomeDirectory(): Promise<string> {
-	return await Promise.resolve("/tmp/gitbutler");
+	return await Promise.resolve("/tmp/reposcope-desktop");
 }
 
 async function webJoinPath(pathSegment: string, ...paths: string[]): Promise<string> {
@@ -184,6 +185,9 @@ async function webRelaunch(): Promise<void> {
  * @throws Throws an error if the backend responds with an error or if the request fails.
  */
 async function webInvoke<T>(command: string, params: Record<string, unknown> = {}): Promise<T> {
+	if (!import.meta.env.VITEST && import.meta.env.VITE_REPOSCOPE_OFFLINE !== "false") {
+		throw new Error("RepoScope Desktop 离线模式不提供 Web 后端");
+	}
 	try {
 		const response = await fetch(`${getApiBaseUrl()}/${command}`, {
 			method: "POST",
@@ -197,7 +201,10 @@ async function webInvoke<T>(command: string, params: Record<string, unknown> = {
 			return out.subject;
 		} else {
 			if (isNormalizedError(out.subject)) {
-				console.error(`ipc->${command}: ${JSON.stringify(params)}`, out.subject);
+				console.error(
+					`ipc->${command}: ${redactSensitiveText(JSON.stringify(params))}`,
+					redactSensitiveText(out.subject.message),
+				);
 				throw new IpcError(out.subject, command);
 			}
 			throw out.subject;
@@ -206,7 +213,10 @@ async function webInvoke<T>(command: string, params: Record<string, unknown> = {
 		// Already wrapped on the explicit-throw path above; only the network
 		// / parse failure path lands here with a raw redux-shaped error.
 		if (isNormalizedError(error) && !(error instanceof IpcError)) {
-			console.error(`ipc->${command}: ${JSON.stringify(params)}`, error);
+			console.error(
+				`ipc->${command}: ${redactSensitiveText(JSON.stringify(params))}`,
+				redactSensitiveText(error.message),
+			);
 			throw new IpcError(error, command);
 		}
 		throw error;
@@ -242,8 +252,8 @@ async function webReadFile(_path: string): Promise<Uint8Array> {
 }
 
 async function webOpenExternalUrl(href: string): Promise<void> {
-	window.open(href, "_blank");
-	return await Promise.resolve();
+	void href;
+	throw new Error("RepoScope Desktop 离线模式不打开外部网址");
 }
 
 class WebListener {
@@ -262,6 +272,9 @@ class WebListener {
 	}
 
 	listen(handler: { name: EventName; handle: EventCallback<any> }): () => Promise<void> {
+		if (!import.meta.env.VITEST && import.meta.env.VITE_REPOSCOPE_OFFLINE !== "false") {
+			return () => Promise.resolve();
+		}
 		this.handlers.push(handler);
 		this.count++;
 		if (!this.socket) {

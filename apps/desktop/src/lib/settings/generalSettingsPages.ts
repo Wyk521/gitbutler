@@ -10,49 +10,28 @@ interface SettingsPage {
 export const generalSettingsPages = [
 	{
 		id: "general",
-		label: "General",
+		label: "常规",
 		icon: "settings",
 	},
 	{
 		id: "appearance",
-		label: "Appearance",
+		label: "外观",
 		icon: "appearance",
 	},
 	{
 		id: "lanes-and-branches",
-		label: "Lanes & branches",
+		label: "工作区与分支",
 		icon: "lanes",
 	},
 	{
 		id: "git",
-		label: "Git stuff",
+		label: "Git 设置",
 		icon: "git",
 	},
 	{
-		id: "integrations",
-		label: "Integrations",
-		icon: "puzzle",
-	},
-	{
-		id: "ai",
-		label: "AI Options",
-		icon: "ai",
-	},
-	{
-		id: "telemetry",
-		label: "Telemetry",
-		icon: "chart-bar-x",
-	},
-	{
 		id: "experimental",
-		label: "Experimental",
+		label: "实验功能",
 		icon: "lab",
-	},
-	{
-		id: "organizations",
-		label: "Organizations",
-		icon: "factory",
-		adminOnly: true,
 	},
 ] as const satisfies readonly SettingsPage[];
 
