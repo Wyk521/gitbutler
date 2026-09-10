@@ -26,7 +26,7 @@ if [ -z "$element" ]; then
 fi
 
 url=$(echo "$element" | xmlstarlet sel -t -v "/release/url" || echo '')
-expected_url="https://github.com/gitbutlerapp/gitbutler/releases/tag/release%2F$VERSION"
+expected_url="https://github.com/Wyk521/gitbutler/releases/tag/release%2F$VERSION"
 if [ "$url" != "$expected_url" ]; then
   echo "ERROR: Expected release URL for $VERSION not found in '$METADATA_FILE'."
   echo ""

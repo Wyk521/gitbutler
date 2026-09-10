@@ -1,5 +1,7 @@
 # will have compiled rust files and executables
 /target/
+# Isolated Windows-toolchain verification artifacts used during local checks.
+/target-reposcope-check*/
 /release/
 generated-archives/
 generated-do-not-edit/

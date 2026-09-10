@@ -13,6 +13,7 @@ members = [
     # No `but-ctx` dependency
     # ideally: idiomatic Rust
     "crates/but-core",           # 📄Core types and capabilities, a catch all that could be split into smaller crates.
+    "crates/but-reposcope",      # 📄Offline repository analysis engine and cache.
     "crates/but-graph",          # 📄The world of GitButler, classification and analysis of commit-graphs.
     "crates/but-ctx",            # 📄Re-use of caches and db-connections, access to all data one would need to be GitButler.
     "crates/but-db",             # 📄Abstractions over Sqlite databases and Caches, with transaction and synchronization support.
@@ -133,7 +134,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-repository = "https://github.com/gitbutlerapp/gitbutler"
+repository = "https://github.com/Wyk521/gitbutler"
 authors = ["GitButler <gitbutler@gitbutler.com>"]
 edition = "2024"
 rust-version = "1.95"
@@ -145,6 +146,7 @@ but-debugging = { path = "crates/but-debugging" }
 but-testsupport = { path = "crates/but-testsupport" }
 but-rebase = { path = "crates/but-rebase" }
 but-core = { path = "crates/but-core" }
+but-reposcope = { path = "crates/but-reposcope" }
 but-ctx = { path = "crates/but-ctx" }
 but-workspace = { path = "crates/but-workspace" }
 but-branches = { path = "crates/but-branches" }

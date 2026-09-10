@@ -1,32 +1,22 @@
 <div align="center">
   
-  <img align="center" width="100px" src="https://gitbutler-docs-images-public.s3.us-east-1.amazonaws.com/md-logo.png" alt="GitButler logo" />
+  <img align="center" width="100px" src="crates/gitbutler-tauri/icons/release/icon.png" alt="RepoScope Desktop logo" />
   <br />
 
-  <h1 align="center">GitButler</h1>
+  <h1 align="center">RepoScope Desktop</h1>
   
   <p align="center">
-   <b>Git, <i>but</i> better</b>.
+   <b>本机仓库洞察与 Git 工作区</b>
    <br/>
-   GitButler is a modern Git-based version control interface with both a GUI and CLI built from the ground up for AI-powered workflows.
+   RepoScope Desktop 基于 GitButler 的本地工作区能力，提供严格离线的仓库分析、审计线索和诊断。
     <br />
     <br />
-    <a href="https://gitbutler.com">Website</a>
+    <a href="https://github.com/Wyk521/gitbutler">代码仓库</a>
     <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-    <a href="https://blog.gitbutler.com/">Blog</a>
-    <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-    <a href="https://docs.gitbutler.com/">Docs</a>
-    <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-    <a href="https://gitbutler.com/downloads">Downloads</a>
+    <a href="REPOSCOPE_DESKTOP.md">实现说明</a>
   </p>
 
   <br/>
-
-  <img width="100%" src="https://gitbutler-docs-images-public.s3.us-east-1.amazonaws.com/app-preview-light.png" alt="GitButler desktop app preview" />
-  <p align="center"><i>Our beautiful GUI</i></p>
-
-  <img width="100%" src="https://gitbutler-docs-images-public.s3.us-east-1.amazonaws.com/cli-preview.png" alt="GitButler CLI preview" />
-  <p align="center"><i>Our amazing <code>but</code> CLI</i></p>
 
   <br/>
 
@@ -54,11 +44,11 @@
 
 <br/>
 
-GitButler is a powerful new Git-based version control system, designed from scratch to be simple, powerful and flexible. It is designed for ease of use and modern agentic workflows.
+RepoScope Desktop 是面向 Windows 10/11 x64 的本机 Git 工作区和仓库洞察工具。GitButler 的并行分支、堆叠分支、提交编辑、冲突处理和撤销历史继续保留；RepoScope 分析引擎完全使用 Rust，并把结果保存到独立的 `reposcope.sqlite`。
 
-It features stacked branches, parallel branches, unlimited undo, easy commit mutations, forge integrations and more.
+它提供堆叠分支、并行分支、无限撤销、提交拆分/合并/修改，以及总览、活跃度、热点、耦合、所有权、代码年龄、Bus Factor、交付溯源、地域、依赖和仓库诊断。
 
-Works instantly in any existing Git repo as a friendlier and more powerful drop-in Git user interface replacement - for you and your agents.
+应用只读取本机 Git 对象和工作目录，不启动 Python、Node 服务，不连接网络，也不修改 Git refs。
 
 ## Main Features
 
@@ -74,17 +64,16 @@ Why use GitButler instead of vanilla Git? What a great question.
   - Logs all operations and changes and allows you to easily undo or revert any operation.
 - **First Class Conflicts** ([gui](https://docs.gitbutler.com/overview#conflicting-branches), [cli](https://docs.gitbutler.com/cli-guides/cli-tutorial/conflict-resolution))
   - Rebases always succeed. Commits can be marked as conflicted and resolved at any time, in any order.
-- **Forge Integration** ([gui](https://docs.gitbutler.com/features/forge-integration/github-integration), [cli](https://docs.gitbutler.com/cli-guides/cli-tutorial/forges))
-  - Authenticate to GitHub, GitLab, or Bitbucket to easily open and update Pull Requests, list branches, get CI statuses and more. No other tools required.
-- **AI Tooling** ([gui](https://docs.gitbutler.com/features/ai-integration/ai-overview), [cli](https://docs.gitbutler.com/cli-guides/cli-tutorial/ai-stuff))
-  - Use built-in AI handlers to help create commit messages, branch names, PR descriptions and more.
-  - Easily install hooks or skills for all modern agent systems to level up their Git management.
+- **仓库洞察**
+  - 在本机生成可追溯的分析批次，支持分页、筛选、提交/文件/证据下钻，并保留旧结果直到新批次成功。
+- **严格离线**
+  - 发布包不注册 Forge、登录、AI、遥测、更新、fetch、push、clone 或外部 URL 命令；源码预览和错误信息进入数据库前自动脱敏。
 
 ## Tech
 
-The GitButler desktop app is a [Tauri](https://tauri.app/)-based application. Its UI is written in [Svelte](https://svelte.dev/) using [TypeScript](https://www.typescriptlang.org) and its backend is written in [Rust](https://www.rust-lang.org/).
+RepoScope Desktop 是基于 [Tauri](https://tauri.app/) 的 Windows 桌面应用，界面使用 [Svelte](https://svelte.dev/) 和 TypeScript，分析与 Git 工作区后端使用 [Rust](https://www.rust-lang.org/)。
 
-The `but` CLI is the same Rust backend engine with a Rust command line UI.
+发布包不携带 `but` CLI 或 Askpass 侧车；GitButler 来源、版权和 FSL-1.1-MIT 许可入口保留在应用关于页和 `LICENSE.md`。
 
 ## Documentation
 

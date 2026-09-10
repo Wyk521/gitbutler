@@ -134,9 +134,6 @@ ARCH="$(arch)"
 
 [ -z "${VERSION-}" ] && error "--version is not set"
 
-[ -z "${TAURI_SIGNING_PRIVATE_KEY-}" ] && error "$TAURI_SIGNING_PRIVATE_KEY is not set"
-[ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD-}" ] && error "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD is not set"
-
 if [ "$CHANNEL" != "release" ] && [ "$CHANNEL" != "nightly" ]; then
 	error "--channel must be either 'release' or 'nightly'"
 fi
@@ -181,18 +178,11 @@ trap 'rm -rf "$TMP_DIR"' exit
 CONFIG_PATH=$(readlink -f "$PWD/../crates/gitbutler-tauri/tauri.conf.$CHANNEL.json")
 
 if [ "$OS" = "windows" ]; then
-	# WARNING: `builtin-but` doesn't work on Windows, see https://github.com/gitbutlerapp/gitbutler/issues/11461.
-	#          Should it be re-added, please ensure that `but` is built
-	#          as part of the 'beforeBuildCommand' in tauri.conf AND it must be injected
-	#          via 'inject-git-binaries.sh'.
-	EXTERNAL_BIN='["gitbutler-git-askpass", "but"]'
-	FEATURES="windows"
+	FEATURES="offline"
 elif [ "$OS" = "linux" ]; then
-	EXTERNAL_BIN='["gitbutler-git-askpass"]'
-	FEATURES="builtin-but packaged-but-distribution"
+	FEATURES="offline"
 elif [ "$OS" = "macos" ]; then
-	EXTERNAL_BIN='["gitbutler-git-askpass"]'
-	FEATURES="builtin-but"
+	FEATURES="offline"
 else
 	echo "Unsupported OS: $OS"
 	exit 1
@@ -201,16 +191,15 @@ fi
 
 # update the version in the tauri release config
 jq  --arg version "$VERSION"\
-    --argjson externalBin "$EXTERNAL_BIN"\
-  '.version = $version | .bundle.externalBin = $externalBin' "$CONFIG_PATH" >"$TMP_DIR/tauri.conf.json"
+  '.version = $version | del(.bundle.externalBin)' "$CONFIG_PATH" >"$TMP_DIR/tauri.conf.json"
 
 # Useful for understanding exactly what goes into the tauri build/bundle.
 cat "$TMP_DIR/tauri.conf.json"
 
-# set the VERSION and CHANNEL as an environment variables so that they available in the but CLI
+# Set build metadata for the desktop bundle. No CLI or Askpass sidecar is
+# built in the offline product.
 export VERSION
 export CHANNEL
-export GITBUTLER_REQUIRE_MCP_APP=1
 
 # Build the app with release config
 if [ -n "$TARGET" ]; then
@@ -244,54 +233,31 @@ mkdir -p "$RELEASE_DIR"
 
 if [ "$OS" = "macos" ]; then
 	MACOS_DMG="$(find "$BUNDLE_DIR/dmg" -depth 1 -type f -name "*.dmg")"
-	MACOS_UPDATER="$(find "$BUNDLE_DIR/macos" -depth 1 -type f -name "*.tar.gz")"
-	MACOS_UPDATER_SIG="$(find "$BUNDLE_DIR/macos" -depth 1 -type f -name "*.tar.gz.sig")"
 
 	cp "$MACOS_DMG" "$RELEASE_DIR"
-	cp "$MACOS_UPDATER" "$RELEASE_DIR"
-	cp "$MACOS_UPDATER_SIG" "$RELEASE_DIR"
 
 	info "built:"
 	info "	- $RELEASE_DIR/$(basename "$MACOS_DMG")"
-	info "	- $RELEASE_DIR/$(basename "$MACOS_UPDATER")"
-	info "	- $RELEASE_DIR/$(basename "$MACOS_UPDATER_SIG")"
 elif [ "$OS" = "linux" ]; then
 	APPIMAGE="$(find "$BUNDLE_DIR/appimage" -name \*.AppImage)"
-	APPIMAGE_UPDATER="$(find "$BUNDLE_DIR/appimage" -name \*.AppImage.tar.gz)"
-	APPIMAGE_UPDATER_SIG="$(find "$BUNDLE_DIR/appimage" -name \*.AppImage.tar.gz.sig)"
 	DEB="$(find "$BUNDLE_DIR/deb" -name \*.deb)"
 	RPM="$(find "$BUNDLE_DIR/rpm" -name \*.rpm)"
-	BUT_CLI="$(readlink -f "$BUILD_DIR/but")"
-
-	"$PWD/add-but-symlink-to-deb.sh" "$DEB"
 
 	cp "$APPIMAGE" "$RELEASE_DIR"
-	cp "$APPIMAGE_UPDATER" "$RELEASE_DIR"
-	cp "$APPIMAGE_UPDATER_SIG" "$RELEASE_DIR"
 	cp "$DEB" "$RELEASE_DIR"
 	cp "$RPM" "$RELEASE_DIR"
-	cp "$BUT_CLI" "$RELEASE_DIR"
 
 	info "built:"
 	info "	- $RELEASE_DIR/$(basename "$APPIMAGE")"
-	info "	- $RELEASE_DIR/$(basename "$APPIMAGE_UPDATER")"
-	info "	- $RELEASE_DIR/$(basename "$APPIMAGE_UPDATER_SIG")"
 	info "	- $RELEASE_DIR/$(basename "$DEB")"
 	info "	- $RELEASE_DIR/$(basename "$RPM")"
-	info "	- $RELEASE_DIR/$(basename "$BUT_CLI")"
 elif [ "$OS" = "windows" ]; then
 	WINDOWS_INSTALLER="$(find "$BUNDLE_DIR/msi" -name \*.msi)"
-	WINDOWS_UPDATER="$(find "$BUNDLE_DIR/msi" -name \*.msi.zip)"
-	WINDOWS_UPDATER_SIG="$(find "$BUNDLE_DIR/msi" -name \*.msi.zip.sig)"
 
 	cp "$WINDOWS_INSTALLER" "$RELEASE_DIR"
-	cp "$WINDOWS_UPDATER" "$RELEASE_DIR"
-	cp "$WINDOWS_UPDATER_SIG" "$RELEASE_DIR"
 
 	info "built:"
 	info "	- $RELEASE_DIR/$(basename "$WINDOWS_INSTALLER")"
-	info "	- $RELEASE_DIR/$(basename "$WINDOWS_UPDATER")"
-	info "	- $RELEASE_DIR/$(basename "$WINDOWS_UPDATER_SIG")"
 else
 	error "unsupported os: $OS"
 fi
